@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KPSS Coğrafya Haritası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --panel:#16262E; --panel-2:#1F3540; --ink:#EAF0EC; --ink-2:#A9BCC3; --line:#2E4652; --accent:#E8B04A;
+  --sea:#BCD3DD; --land:#E3E9D8; --neigh:#CDD3C9; --border:#F4F7F2; --tur-border:#7E907E; --page:#0F1C22;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--panel:#101E25;--panel-2:#182C36;--page:#0B151A;--sea:#A9C4D0;}}
+:root[data-theme="dark"]{--panel:#101E25;--panel-2:#182C36;--page:#0B151A;--sea:#A9C4D0;}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--page);color:var(--ink);font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45}
+.app{display:grid;grid-template-columns:340px 1fr;height:100%;overflow:hidden}
+.panel{background:var(--panel);min-height:0;overflow-y:auto;padding:26px 22px 28px;border-right:1px solid var(--line)}
+h1{font-family:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;font-weight:700;font-size:30px;line-height:1.05;margin:0 0 10px;letter-spacing:-.02em}
+.lead{margin:0 0 22px;color:var(--ink-2);font-size:14px}
+h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+.bar{display:flex;gap:8px;margin:0 0 10px}
+.bar button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer}
+.bar button:hover{background:var(--panel-2)}
+.tg{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+.tg:hover{background:var(--panel-2)}
+.tg input{position:absolute;opacity:0;pointer-events:none}
+.tg .sw{width:30px;height:30px;border-radius:8px;background:#E3E9D8;display:grid;place-items:center;flex:none;opacity:.45;transition:opacity .15s}
+.tg .tt{display:flex;flex-direction:column;line-height:1.2}
+.tg .tt b{font-weight:600;font-size:14.5px}
+.tg .tt small{color:var(--ink-2);font-size:12.5px}
+.tg:has(input:checked){background:var(--panel-2);border-color:var(--line)}
+.tg:has(input:checked) .sw{opacity:1}
+.tg:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+.city{display:flex;align-items:center;gap:9px;margin:10px 0 0;padding:8px 10px;color:var(--ink-2);font-size:13.5px;cursor:pointer}
+.city input{accent-color:var(--accent);width:16px;height:16px}
+.items{margin-top:24px;border-top:1px solid var(--line);padding-top:16px}
+.items h3{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:13.5px;font-weight:600;color:var(--ink-2);margin:16px 0 4px}
+.items ul{list-style:none;margin:0;padding:0}
+.items button{display:flex;gap:9px;align-items:flex-start;width:100%;text-align:left;font:inherit;font-size:14px;color:var(--ink);background:none;border:0;border-radius:8px;padding:5px 8px;cursor:pointer}
+.items button:hover{background:var(--panel-2)}
+.items button:focus-visible{outline:2px solid var(--accent)}
+.items small{display:block;color:var(--ink-2);font-size:12px;line-height:1.35}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none;margin-top:6px;box-shadow:0 0 0 2px #E3E9D8}
+.ln{width:14px;height:3px;border-radius:2px;background:var(--c);flex:none;margin-top:8px;box-shadow:0 0 0 1.5px #E3E9D8}
+.empty{color:var(--ink-2);font-size:14px}
+.stage{position:relative;min-height:0;background:var(--sea);overflow:hidden}
+#map{width:100%;height:100%;display:block;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}
+#map.drag{cursor:grabbing}
+#map:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.lb{paint-order:stroke;stroke:rgba(255,255,255,.93);stroke-width:3.4px;stroke-linejoin:round;font-family:"Instrument Sans",system-ui,sans-serif;pointer-events:none}
+.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
+.zoom button{width:42px;height:42px;font:600 20px "Instrument Sans",sans-serif;color:#16262E;background:#fff;border:0;border-bottom:1px solid #DDE4DA;cursor:pointer}
+.zoom button:last-child{border-bottom:0;font-size:13px}
+.zoom button:hover{background:#EEF3EA}
+.zoom button:focus-visible{outline:2px solid #16262E;outline-offset:-4px}
+.note{position:absolute;left:14px;bottom:14px;max-width:calc(100% - 28px);background:rgba(22,38,46,.88);color:#EAF0EC;font-size:12.5px;padding:6px 12px;border-radius:999px}
+.src{position:absolute;right:14px;bottom:12px;font-size:11px;color:#3B5566;background:rgba(255,255,255,.7);padding:2px 8px;border-radius:6px}
+.quizbox{margin:0 0 18px;padding:12px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
+.quizbox h2{margin-bottom:4px}
+.quizbox p{margin:0 0 10px;color:var(--ink-2);font-size:12.5px;line-height:1.4}
+#quizStart{display:flex;gap:6px;flex-wrap:wrap}
+#quizStart button,.qbar button{font:600 12.5px "Instrument Sans",sans-serif;color:var(--panel);background:var(--accent);border:0;border-radius:999px;padding:6px 12px;cursor:pointer}
+#quizStart button:hover,.qbar button:hover{filter:brightness(1.08)}
+.qstage{position:absolute;z-index:3;top:16px;left:50%;width:min(380px,calc(100% - 32px));transform:translateX(-50%);padding:12px 14px;background:rgba(16,30,37,.94);border:1px solid rgba(232,176,74,.65);border-radius:14px;box-shadow:0 8px 24px rgba(15,28,34,.28);color:var(--ink)}
+.qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px}
+.qtop button{margin-left:auto;width:26px;height:26px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:50%;cursor:pointer}
+.qq{margin:10px 0 8px;font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:17px;line-height:1.2}
+.qq b{color:var(--accent)}
+.qhint,.qres{font-size:12.5px;color:var(--ink-2)}
+.qres.ok{color:#8ED39E}.qres.no{color:#F29B9B}
+.qbar{display:flex;gap:7px;margin-top:10px}
+.qbar .ghost{color:var(--ink);background:transparent;border:1px solid var(--line)}
+.qdone{text-align:center;margin:12px 0 4px;color:var(--ink-2)}
+.qscore{font:700 30px "Bricolage Grotesque","Instrument Sans",sans-serif;color:var(--accent)}
+
+.items section+section{margin-top:6px}
+.disc{font-size:12px;color:var(--ink-2);background:var(--panel-2);border-radius:10px;padding:9px 12px;margin:0 0 4px;line-height:1.45}
+.gen{margin:2px 0 6px;font-size:13px}
+.gen summary{cursor:pointer;color:var(--accent);font-weight:600;padding:4px 8px;border-radius:8px;list-style:none}
+.gen summary::-webkit-details-marker{display:none}
+.gen summary::before{content:"+ ";font-weight:700}
+.gen[open] summary::before{content:"− "}
+.gen summary:focus-visible{outline:2px solid var(--accent)}
+.gen ul,.kp ul{margin:6px 0 4px;padding:0 4px 0 22px;color:var(--ink);line-height:1.45}
+.gen li,.kp li{margin:0 0 6px;font-size:13px}
+.gen ul{border-left:2px solid var(--line);margin-left:8px}
+.items button span{flex:1}
+.chev{width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(45deg);margin:6px 4px 0 0;flex:none;transition:transform .15s}
+.items button[aria-expanded="true"] .chev{transform:rotate(-135deg);margin-top:10px}
+.kp{margin:2px 8px 8px 26px;padding:8px 10px 4px;background:var(--panel-2);border-left:3px solid var(--c);border-radius:0 10px 10px 0}
+.kp b{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:12.5px;color:var(--accent)}
+.kp ul{padding-left:16px;margin:4px 0 2px}
+.reg{margin:12px 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between}
+.reg span{color:var(--ink-2);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.items .chip{width:auto;display:inline-block;font-size:12.5px;padding:3px 9px;border:1px solid var(--line);border-radius:999px}
+@media (min-width:901px){
+  html,body{overflow:hidden}
+  .app{min-height:100vh}
+  .stage{height:100vh}
+}
+@media (max-width:900px){
+  html,body{height:auto;overflow:visible}
+  .app{display:flex;flex-direction:column;height:auto;overflow:visible}
+  .stage{order:-1;height:64svh;height:64vh;position:sticky;top:0;z-index:2}
+  .panel{border-right:0;overflow:visible;padding:20px 16px 32px}
+  h1{font-size:26px}
+  .src{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <h1>KPSS Coğrafya Haritası</h1>
+    <p class="lead">Dağlar, fay hatları, ova ve platolar, masifler, göller, bölgeler, komşular, levhalar ve 81 il. Katmanları açıp kapatın; listedeki bir öğeye tıklayınca haritada bulur ve KPSS notlarını açar.</p>
+    <h2>Katmanlar</h2>
+    <div class="bar"><button id="all" type="button">Hepsini aç</button><button id="none" type="button">Temizle</button></div>
+    <section class="quizbox">
+      <h2>🧠 Bilgini test et</h2>
+      <p>Aktif katmanlardaki isimlerden rastgele soru sorulur; haritada doğru yeri işaretlemen istenir.</p>
+      <div id="quizStart" aria-label="Soru sayısı seçimi">
+        <button class="qn" type="button" data-n="5">5 soru</button>
+        <button class="qn" type="button" data-n="8">8 soru</button>
+        <button class="qn" type="button" data-n="12">12 soru</button>
+      </div>
+    </section>
+    <div id="toggles"></div>
+    <label class="city" id="citiesRow"><input type="checkbox" id="showCities" checked> Şehir adlarını göster</label>
+    <div class="items" id="items"></div>
+  </aside>
+  <main class="stage" id="stage">
+    <svg id="map" tabindex="0" role="img" aria-label="KPSS Coğrafya Haritası. Yakınlaştırmak için + ve - tuşlarını, kaydırmak için ok tuşlarını kullanın.">
+      <g id="world"></g><g id="over"></g>
+    </svg>
+    <div id="quizcard" class="qstage" hidden></div>
+    <div class="zoom"><button id="zin" type="button" aria-label="Yakınlaştır">+</button><button id="zout" type="button" aria-label="Uzaklaştır">−</button><button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button></div>
+    <div class="note" id="note" hidden></div>
+    <div class="src">Sınırlar: Natural Earth · Konumlar yaklaşıktır</div>
+  </main>
+</div>
+<script>
+const GEO=/*GEO*/;
+/*DATA*/
+/*APP*/
+</script>
+</body>
+</html>
