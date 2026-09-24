@@ -18,9 +18,9 @@ const LAKES = [
   ...LAKES_APPROX.map(o=>({name:o[0],region:o[1],lon:o[2],lat:o[3],rx:o[4],ry:o[5],ang:o[6],real:false}))
 ];
 
-const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',ova:'#2F6B3A',plato:'#8C6420',masif:'#4B2E17',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96'};
+const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',ova:'#2F6B3A',plato:'#8C6420',masif:'#4B2E17',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96',nehirler:'#1769AA',akarsular:'#3287B8'};
 const TYPE_NAME={kirik:'Kırık dağlar',kivrim:'Kıvrım dağlar',volkanik:'Volkanik dağlar'};
-const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,masif:false,levha:false,iller:false,bolge:false,goller:false,komsu:false},cities:true,k:1,tx:0,ty:0};
+const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,masif:false,nehirler:false,akarsular:false,levha:false,iller:false,bolge:false,goller:false,komsu:false},cities:true,k:1,tx:0,ty:0};
 const svg=document.getElementById('map'), world=document.getElementById('world'), over=document.getElementById('over'), note=document.getElementById('note');
 let W=800,H=600,fit=1;
 const ctx=document.createElement('canvas').getContext('2d');
@@ -49,6 +49,9 @@ function buildZones(){
     LAKES.forEach(l=>{if(l.real){z+=`<path d="${l.path}" fill="#4FA8D8" fill-opacity=".85" stroke="${C.goller}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;}
       else{z+=ell(['',0,l.lon,l.lat,l.rx,l.ry,l.ang],'#4FA8D8',C.goller,.75);}});
   }
+  const riverPath=(r)=>`M${r.pts.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(',')).join('L')}`;
+  if(state.on.nehirler) RIVERS.forEach(r=>{z+=`<path d="${riverPath(r)}" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path d="${riverPath(r)}" fill="none" stroke="${C.nehirler}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;});
+  if(state.on.akarsular) STREAMS.forEach(r=>{z+=`<path d="${riverPath(r)}" fill="none" stroke="${C.akarsular}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;});
   document.getElementById('zones').innerHTML=z;
   document.getElementById('neighborShapes').innerHTML=state.on.komsu ? NEIGHBORS.map(n=>`<path d="${n.path}" fill="${n.color}" fill-opacity=".2" stroke="#58717F" stroke-opacity=".7" stroke-width="0.8" vector-effect="non-scaling-stroke"/>`).join('') : '';
   let f='';
@@ -122,7 +125,7 @@ function renderOverlay(){
   if(state.on.masif) MASIF.forEach(o=>zoneItems.push([o,C.masif,[]]));
   if(state.on.ova){OVA.forEach(o=>zoneItems.push([o,C.ova,o[7]]));PLATO.forEach(o=>zoneItems.push([o,C.plato,o[7]]));}
   if(labelsOn) zoneItems.forEach(([o,col])=>{const [wx,wy]=P(o[2],o[3]);const x=sx(wx),y=sy(wy);if(!inView(x,y,120))return;
-    const lines=[{t:o[0],s:12.5,w:700,i:false,c:col},{t:o[1],s:10.5,w:500,i:true,c:col}];const b=blockOf(lines);
+    const lines=[{t:o[0],s:12.5,w:700,i:false,c:col}];const b=blockOf(lines);
     const cands=[[0,0],[0,-b.h-6],[0,b.h+6],[b.w*0.55,0],[-b.w*0.55,0],[b.w*0.55,-b.h-4],[-b.w*0.55,-b.h-4],[b.w*0.55,b.h+4],[-b.w*0.55,b.h+4],
       [0,-b.h-30,1],[0,b.h+30,1],[b.w*0.6+20,-b.h,1],[-b.w*0.6-20,-b.h,1],[b.w*0.6+20,b.h,1],[-b.w*0.6-20,b.h,1],[0,-2*b.h-40,1],[0,2*b.h+40,1]];
     let pick=null;for(const c of cands){const r={x1:x+c[0]-b.w/2-2,y1:y+c[1]-b.h/2-2,x2:x+c[0]+b.w/2+2,y2:y+c[1]+b.h/2+2};if(free(r)){pick=c;placed.push(r);break;}}
@@ -160,6 +163,15 @@ function renderOverlay(){
     const cands=[[x-b.w/2,y-h2],[x-b.w/2,y-h2-24],[x-b.w/2,y+h2+8],[x+8,y-h2],[x-8-b.w,y-h2]];
     let pick=null;for(const c of cands){const r={x1:c[0]-2,y1:c[1]-1,x2:c[0]+b.w+2,y2:c[1]+b.h+1};if(free(r)){pick=c;placed.push(r);break;}}
     if(pick)out+=draw(l,pick[0],pick[1],'start',b.w);else hidden++;
+  });
+  const riverLabels=(state.on.nehirler?RIVERS:[]).concat(state.on.akarsular?STREAMS:[]);
+  riverLabels.forEach(r=>{
+    const p=r.pts[Math.floor(r.pts.length/2)], [wx,wy]=P(p[0],p[1]), x=sx(wx), y=sy(wy);
+    if(!inView(x,y,80)||!labelsOn)return;
+    const col=RIVERS.includes(r)?C.nehirler:C.akarsular;
+    const ll=[{t:r.name,s:11.5,w:700,i:true,c:col}],b=blockOf(ll);
+    const rbox={x1:x-b.w/2-2,y1:y-b.h/2-1,x2:x+b.w/2+2,y2:y+b.h/2+1};
+    if(free(rbox)){placed.push(rbox);out+=draw(ll,x-b.w/2,y-b.h/2,'start',b.w);}
   });
   // 5) deniz adları
   SEAS.forEach(s=>{const [wx,wy]=P(s[1],s[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,100))return;
@@ -225,9 +237,11 @@ const swatch={kirik:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8
  iller:`<svg width="16" height="14" viewBox="0 0 16 14"><circle cx="5" cy="5" r="2.4" fill="#22303B"/><circle cx="11" cy="8" r="2.4" fill="#22303B"/><circle cx="5" cy="11" r="2" fill="#22303B"/></svg>`,
  bolge:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M2 9 Q1 3 8 3 Q15 3 14 9 Q13 12 8 12 Q3 12 2 9Z" fill="#3D6EA5" fill-opacity=".45" stroke="#3D6EA5" stroke-dasharray="2 1.3"/></svg>`,
  goller:`<svg width="16" height="14" viewBox="0 0 16 14"><ellipse cx="8" cy="8" rx="6.5" ry="4.5" fill="#4FA8D8" fill-opacity=".85" stroke="${C.goller}"/></svg>`,
+ nehirler:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 11C5 2 10 13 15 3" fill="none" stroke="${C.nehirler}" stroke-width="2.5"/></svg>`,
+ akarsular:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 11C5 2 10 13 15 3" fill="none" stroke="${C.akarsular}" stroke-width="1.8"/></svg>`,
  levha:`<svg width="16" height="14" viewBox="0 0 16 14"><text x="8" y="11" text-anchor="middle" font-size="12" font-weight="700" fill="#9FC2DD" font-family="serif">L</text></svg>`,
  komsu:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 3h14v8H1Z" fill="#6D8594" fill-opacity=".35" stroke="#58717F"/></svg>`};
-const LAYERS=[['kirik','Kırık dağlar','koyu sarı'],['kivrim','Kıvrım dağlar','kahverengi'],['volkanik','Volkanik dağlar','kırmızı'],['fay','Fay hatları','şehirlerle'],['ova','Ova ve platolar','bölge ve şehirlerle'],['masif','Masifler','koyu kahverengi'],['goller','Göller','doğal göller'],['bolge','Bölgeler','il sınırlarıyla'],['komsu','Komşularımız','8 ülke · Natural Earth'],['levha','Levhalar','yalnızca isim'],['iller','Tüm iller','81 il adı']];
+const LAYERS=[['kirik','Kırık dağlar','koyu sarı'],['kivrim','Kıvrım dağlar','kahverengi'],['volkanik','Volkanik dağlar','kırmızı'],['fay','Fay hatları','şehirlerle'],['ova','Ova ve platolar','bölge ve şehirlerle'],['masif','Masifler','koyu kahverengi'],['nehirler','Nehirler','başlıca akarsular'],['akarsular','Akarsular','nehir kolları'],['goller','Göller','doğal göller'],['bolge','Bölgeler','il sınırlarıyla'],['komsu','Komşularımız','8 ülke · Natural Earth'],['levha','Levhalar','yalnızca isim'],['iller','Tüm iller','81 il adı']];
 function buildToggles(){
   const el=document.getElementById('toggles');
   el.innerHTML=LAYERS.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('');
@@ -253,10 +267,12 @@ function buildList(){
     }});
   if(state.on.fay) h+=sec('Fay hatları','fay',FAULTS.map((f,i)=>item('f'+i,f.name,C.fay,f.cities.join(', '),'ln')));
   if(state.on.ova){
-    h+=sec('Ovalar','ova',OVA.map((o,i)=>item('o'+i,o[0],C.ova,o[1]+' · '+o[7].join(', '))));
-    h+=sec('Platolar','plato',PLATO.map((o,i)=>item('p'+i,o[0],C.plato,o[1]+' · '+o[7].join(', '))));}
+    h+=sec('Ovalar','ova',OVA.map((o,i)=>item('o'+i,o[0],C.ova,'')));
+    h+=sec('Platolar','plato',PLATO.map((o,i)=>item('p'+i,o[0],C.plato,'')));}
   if(state.on.masif) h+=sec('Masifler','masif',MASIF.map((o,i)=>item('s'+i,o[0],C.masif,o[1])));
   if(state.on.goller) h+=sec('Göller','goller',LAKES.map((l,i)=>item('g'+i,l.name,C.goller,l.region||'')));
+  if(state.on.nehirler) h+=sec('Nehirler','nehirler',RIVERS.map((r,i)=>item('r'+i,r.name,C.nehirler,r.basin,'ln')));
+  if(state.on.akarsular) h+=sec('Akarsular · kollar','akarsular',STREAMS.map((r,i)=>item('a'+i,r.name,C.akarsular,r.basin,'ln')));
   if(state.on.komsu) h+=sec('Komşularımız','komsu',NEIGHBORS.map((n,i)=>item('n'+i,n.name,n.color,'kara sınırı')));
   if(state.on.levha) h+=sec('Levhalar','levha',PLATES.map((o,i)=>item('l'+i,o[0],C.levha,'')));
   if(state.on.iller){h+=`<section><h3>İller (81)</h3>${gen('iller')}`;
@@ -273,6 +289,8 @@ function buildList(){
     else if(k==='s')focusOn([[MASIF[i][2],MASIF[i][3]]],3.5);
     else if(k==='b')focusOn(REGION_GEO[i].cities.map(n=>CITY[n]),1.05);
     else if(k==='g')focusOn([[LAKES[i].lon,LAKES[i].lat]],5.5);
+    else if(k==='r')focusOn(RIVERS[i].pts,2.5);
+    else if(k==='a')focusOn(STREAMS[i].pts,2.5);
     else if(k==='n')focusOn([[NEIGHBORS[i].labelLon,NEIGHBORS[i].labelLat]],2.5);
     else focusOn([[PLATES[i][1],PLATES[i][2]]],2);});
   box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const c=CITY[b.dataset.c];focusOn([[c[0],c[1]]],5);});
@@ -283,7 +301,7 @@ document.getElementById('none').onclick=()=>{Object.keys(state.on).forEach(k=>st
 
 /* ---------- quiz ---------- */
 const QUIZ={active:false,pool:[],idx:0,total:8,correct:0,answered:false,guess:null,target:null};
-const TOL={kirik:45,kivrim:45,volkanik:45,ova:55,plato:70,masif:80,levha:320,iller:45,bolge:200,goller:35,komsu:100};
+const TOL={kirik:45,kivrim:45,volkanik:45,ova:55,plato:70,masif:80,levha:320,iller:45,bolge:200,goller:35,komsu:100,nehirler:60,akarsular:50};
 function poolFromCat(cat){
   if(cat==='kirik'||cat==='kivrim'||cat==='volkanik') return MOUNTAINS.filter(m=>m[1]===cat).map(m=>({name:m[0],lon:m[2],lat:m[3],cat,tol:TOL[cat]}));
   if(cat==='ova') return OVA.map(o=>({name:o[0],lon:o[2],lat:o[3],cat,tol:TOL.ova}));
@@ -293,6 +311,7 @@ function poolFromCat(cat){
   if(cat==='iller') return ILLER.map(n=>({name:n,lon:CITY[n][0],lat:CITY[n][1],cat,tol:TOL.iller}));
   if(cat==='bolge') return REGION_GEO.map(g=>({name:g.full,lon:g.lon,lat:g.lat,cat,tol:TOL.bolge}));
   if(cat==='goller') return LAKES.map(l=>({name:l.name,lon:l.lon,lat:l.lat,cat,tol:TOL.goller}));
+  if(cat==='nehirler'||cat==='akarsular') return (cat==='nehirler'?RIVERS:STREAMS).map(r=>({name:r.name,lon:r.pts[Math.floor(r.pts.length/2)][0],lat:r.pts[Math.floor(r.pts.length/2)][1],cat,tol:TOL[cat]}));
   if(cat==='komsu') return NEIGHBORS.map(n=>({name:n.name,lon:n.labelLon,lat:n.labelLat,cat,tol:TOL.komsu}));
   return [];
 }

@@ -9,7 +9,7 @@ Bu klasör, Türkiye yerşekilleri / KPSS coğrafya haritası projesinin şu ank
 dist/turkiye-yersekilleri.html   ← ÇALIŞAN, tek parça, yayınlanabilir son çıktı
 src/template.html                ← İskelet HTML + CSS (yer tutucular: /*GEO*/ /*DATA*/ /*APP*/)
 src/data.js                      ← Ham veri: dağlar (horst/graben), fay hatları, ova/plato, masif, levha,
-                                    il koordinatları, bölge-il eşlemesi, yaklaşık göller
+                                    il koordinatları, bölge-il eşlemesi, göller, nehirler ve akarsular
 src/notes.js                     ← KPSS notları: GENERAL (kategori geneli) + NOTES (öğe bazlı)
                                     + REGIONS (bölge adı/renk eşlemesi)
 src/app.js                       ← Tüm mantık: harita çizimi, etiket çakışma-önleme motoru,
@@ -54,6 +54,10 @@ tekrar indirilebilir: `https://raw.githubusercontent.com/nvkelso/natural-earth-v
   Hazar, Erçek, Kovada yaklaşık elips ile (`data.js` → `LAKES_APPROX`). Genel bilgi
   kutusu (göl oluşum türleri: tektonik/karstik/volkanik/set/buzul) ve her göl için
   ayrı KPSS notu `notes.js` içinde mevcut.
+- **Nehirler ve akarsular katmanları eklendi:** Kaynak PDF'de geçen başlıca
+  havzalar ve akarsular iki ayrı katmanda gösterilir. Nehir çizgileri daha
+  kalın, akarsu kolları daha ince çizilir; güzergâhlar bu harita ölçeğinde
+  yaklaşık gösterimdir. Katmanların genel KPSS notları `notes.js` içindedir.
 - **Quiz motoru (arka uç) yazıldı** (`app.js` içinde `QUIZ` nesnesi ve
   `buildQuizPool / startQuiz / submitGuess / nextQ / renderQuizCard / renderQuizDone /
   endQuiz` fonksiyonları): aktif katmanlardan soru havuzu kuruluyor, haritaya
@@ -71,7 +75,7 @@ tekrar indirilebilir: `https://raw.githubusercontent.com/nvkelso/natural-earth-v
 1. Quiz arayüzü `#quizcard`, `#quizStart` ve `.qn` ile bağlandı; Playwright ile
    masaüstü ve mobilde soru, tahmin işaretleri ve mesafe sonucu doğrulandı.
 
-2. **PDF kaynağı taranmış olduğu için konu bazlı işlendi.** Kullanıcı KPSS'ye temel aldığı bir kaynak
+2. **`docs/source.pdf` bu projenin birincil kaynağıdır.** PDF kaynağı taranmış olduğu için konu bazlı işlendi. Kullanıcı KPSS'ye temel aldığı bir kaynak
    PDF paylaştı (255 sayfa). `pdfinfo`/`pdffonts`/`pdftotext` denendi: PDF bir
    RICOH fotokopi/tarayıcıdan çıkmış, **metin katmanı yok** (taranmış görüntü).
    Yani `pdftotext` boş dönüyor. Devam eden oturumda:

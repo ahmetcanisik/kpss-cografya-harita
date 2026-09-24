@@ -97,6 +97,31 @@ const MASIF = [
 const PLATES = [["Avrasya Levhası",31.5,43.15],["Anadolu Levhası",32.5,38.55],["Arap Levhası",39.6,35.4],["Afrika Levhası",29.5,34.5],["Ege Levhası",26.3,36.55]];
 const SEAS = [["Karadeniz",35.0,42.55],["Ege Denizi",25.2,38.9],["Akdeniz",33.0,35.3],["Marmara Denizi",28.1,40.72]];
 
+// Başlıca akarsu güzergâhları. Güzergâhlar harita ölçeğinde yaklaşık çizilmiştir.
+const RIVERS = [
+  {name:"Kızılırmak",basin:"Karadeniz",pts:[[38.8,39.6],[37.7,39.4],[36.4,39.1],[35.2,39.2],[34.5,40.0],[34.0,40.6],[35.0,41.0],[35.8,41.6]]},
+  {name:"Yeşilırmak",basin:"Karadeniz",pts:[[36.5,39.7],[36.0,40.1],[35.6,40.5],[36.1,40.8],[36.6,41.0],[37.3,41.2]]},
+  {name:"Sakarya",basin:"Karadeniz",pts:[[31.9,39.7],[31.5,40.1],[30.9,40.4],[30.5,40.8],[30.3,41.1],[30.0,41.3]]},
+  {name:"Fırat",basin:"Basra Körfezi",pts:[[39.7,39.8],[39.5,39.0],[38.9,38.5],[38.3,38.1],[37.5,37.8],[37.0,37.3],[37.7,36.8],[38.2,36.6]]},
+  {name:"Dicle",basin:"Basra Körfezi",pts:[[40.8,38.0],[40.2,37.8],[40.0,37.3],[40.5,36.9],[41.1,36.6],[41.7,36.4]]},
+  {name:"Aras",basin:"Hazar Denizi",pts:[[40.2,39.8],[41.0,40.0],[42.0,39.9],[43.0,39.7],[44.0,39.6],[44.7,39.5]]},
+  {name:"Çoruh",basin:"Karadeniz",pts:[[41.0,40.9],[41.4,40.7],[41.6,40.3],[41.7,40.0],[41.6,39.8]]},
+  {name:"Meriç",basin:"Ege Denizi",pts:[[26.2,42.0],[26.4,41.7],[26.0,41.4],[26.1,41.1],[26.5,40.9]]},
+  {name:"Seyhan",basin:"Akdeniz",pts:[[36.0,38.2],[35.5,37.8],[35.3,37.3],[35.2,36.9]]},
+  {name:"Ceyhan",basin:"Akdeniz",pts:[[36.5,38.2],[36.7,37.7],[36.7,37.2],[36.6,36.8]]},
+  {name:"Asi",basin:"Akdeniz",pts:[[36.9,36.8],[36.3,36.5],[36.1,36.2],[36.1,35.9]]}
+];
+const STREAMS = [
+  {name:"Büyük Menderes",basin:"Ege",pts:[[30.2,38.0],[29.6,37.9],[29.1,37.8],[28.5,37.8],[27.9,37.8],[27.4,37.8]]},
+  {name:"Küçük Menderes",basin:"Ege",pts:[[28.8,38.3],[28.4,38.2],[28.0,38.1],[27.6,38.0],[27.4,37.9]]},
+  {name:"Gediz",basin:"Ege",pts:[[29.0,39.0],[28.5,38.8],[28.1,38.6],[27.7,38.6],[27.3,38.6]]},
+  {name:"Göksu",basin:"Akdeniz",pts:[[35.7,38.0],[35.0,37.4],[34.6,36.9],[34.2,36.4]]},
+  {name:"Murat",basin:"Fırat kolu",pts:[[42.7,39.3],[42.0,39.2],[41.3,39.0],[40.6,38.9],[39.8,39.1]]},
+  {name:"Kura",basin:"Hazar Denizi",pts:[[42.7,41.1],[43.2,40.8],[43.8,40.5],[44.3,40.2]]},
+  {name:"Porsuk",basin:"Sakarya kolu",pts:[[31.2,39.6],[30.8,39.7],[30.4,39.8],[30.0,40.0]]},
+  {name:"Delice",basin:"Kızılırmak kolu",pts:[[34.0,39.5],[34.5,39.7],[35.0,39.8]]}
+];
+
 // Yaklaşık göl alanları (gerçek poligon verisi bulunamayanlar için elips)
 const LAKES_APPROX = [
 ["İznik Gölü","Marmara Bölgesi",29.52,40.43,0.09,0.045,-10],
