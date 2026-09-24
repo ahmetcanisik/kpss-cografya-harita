@@ -1,5 +1,5 @@
 const REG={cx:(35.5-24.3)*77.7,cy:(43.6-39.0)*100,w:(46.6-24.4)*77.7,h:7.4*100};
-const LON0=24.3, LAT1=43.6, KX=77.7, KY=100, W0=(46.0-LON0)*KX, H0=(LAT1-34.0)*KY;
+const LON0=24.3, LAT1=43.6, KX=77.7, KY=100;
 const P=(lon,lat)=>[(lon-LON0)*KX,(LAT1-lat)*KY];
 const invP=(x,y)=>[x/KX+LON0, LAT1-y/KY];
 function distKm(lon1,lat1,lon2,lat2){
@@ -7,20 +7,15 @@ function distKm(lon1,lat1,lon2,lat2){
   const x=(lon2-lon1)*Math.PI/180*Math.cos(la), y=(lat2-lat1)*Math.PI/180;
   return Math.sqrt(x*x+y*y)*R;
 }
+const BOOK=GEO.book||{}, OSM=GEO.osm||{};
 const REGION_GEO = REGIONS.map(([full,key,color])=>{
   const meta = GEO.regionMeta[key];
   const [cx,cy] = P(meta.lon, meta.lat);
   return {full,key,color,lon:meta.lon,lat:meta.lat,cx,cy,cities:BOLGE_ILLER[key]};
 });
-const NEIGHBORS = (GEO.neighbors||[]).map(n=>({...n,cx:P(n.labelLon,n.labelLat)[0],cy:P(n.labelLon,n.labelLat)[1]}));
-const LAKES = [
-  ...GEO.lakesReal.map(l=>({name:l.name,lon:l.lon,lat:l.lat,path:l.path,real:true})),
-  ...LAKES_APPROX.map(o=>({name:o[0],region:o[1],lon:o[2],lat:o[3],rx:o[4],ry:o[5],ang:o[6],real:false}))
-];
 
-const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',ova:'#2F6B3A',plato:'#8C6420',masif:'#4B2E17',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96',nehirler:'#1769AA',akarsular:'#3287B8'};
-const TYPE_NAME={kirik:'Kırık dağlar',kivrim:'Kıvrım dağlar',volkanik:'Volkanik dağlar'};
-const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,masif:false,nehirler:false,akarsular:false,levha:false,iller:false,bolge:false,goller:false,komsu:false},cities:true,k:1,tx:0,ty:0};
+const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',masif:'#6B4424',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96',nehirler:'#1769AA',akarsular:'#3287B8',sinir:'#E07B00',barajlar:'#0D4F7A',komsu:'#385565'};
+const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,plato:false,masif:false,nehirler:false,akarsular:false,sinir:false,goller:false,barajlar:false,havza:false,toprak:false,deprem:false,bolge:false,iller:false,komsu:false,levha:false},cities:true,k:1,tx:0,ty:0};
 const svg=document.getElementById('map'), world=document.getElementById('world'), over=document.getElementById('over'), note=document.getElementById('note');
 let W=800,H=600,fit=1;
 const ctx=document.createElement('canvas').getContext('2d');
@@ -28,197 +23,183 @@ const wcache={};
 function tw(t,size,weight,italic,ls){const key=t+size+weight+italic+ls;if(wcache[key]!==undefined)return wcache[key];ctx.font=`${italic?'italic ':''}${weight} ${size}px "Instrument Sans", system-ui, sans-serif`;return wcache[key]=ctx.measureText(t).width+(ls||0)*t.length;}
 const S=()=>fit*state.k;
 const sx=(x)=>x*S()+state.tx, sy=(y)=>y*S()+state.ty;
-const screenToLonLat=(cx,cy)=>invP((cx-state.tx)/S(),(cy-state.ty)/S());
+const screenToWorld=(cx,cy)=>[(cx-state.tx)/S(),(cy-state.ty)/S()];
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+
+/* ---------- öğe modeli ---------- */
+// Her öğe: {layer, name, sub, group, color, kind:'point'|'line'|'area', d (dünya koordinatında SVG path), wx, wy (etiket noktası), box}
+const toD=pts=>'M'+pts.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(',')).join('L');
+function boxOfD(d){let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;const n=d.match(/-?\d+(\.\d+)?/g)||[];
+  for(let i=0;i+1<n.length;i+=2){const x=+n[i],y=+n[i+1];if(x<x1)x1=x;if(x>x2)x2=x;if(y<y1)y1=y;if(y>y2)y2=y;}return [x1,y1,x2,y2];}
+function mk(layer,o){
+  const it={layer,group:'',sub:'',...o};
+  if(it.kind==='point'){const [x,y]=P(it.lon,it.lat);it.wx=x;it.wy=y;it.box=[x,y,x,y];}
+  else{it.box=boxOfD(it.d);if(it.lon!==undefined){const [x,y]=P(it.lon,it.lat);it.wx=x;it.wy=y;}else{it.wx=(it.box[0]+it.box[2])/2;it.wy=(it.box[1]+it.box[3])/2;}}
+  return it;
+}
+function lineMid(lines){ // en uzun çizginin orta noktası
+  let best=lines[0];lines.forEach(l=>{if(l.length>best.length)best=l;});return best[Math.floor(best.length/2)];
+}
+const ITEMS={};
+(function buildItems(){
+  const I=(k)=>ITEMS[k]=[];
+  I('kirik');HORSTS.forEach(h=>{const m=lineMid(h.lines);ITEMS.kirik.push(mk('kirik',{name:h.name,group:'Horstlar',sub:'Horst',color:C.kirik,kind:'line',d:h.lines.map(toD).join(''),lon:m[0],lat:m[1]}));});
+  GRABENS.forEach(g=>ITEMS.kirik.push(mk('kirik',{name:g[0],group:'Grabenler',sub:'Graben',color:C.kirik,kind:'point',marker:'graben',lon:g[1],lat:g[2],tol:35})));
+  I('kivrim');(BOOK.folds||[]).concat(FOLDS_EXTRA).forEach(f=>{const m=lineMid(f.lines);ITEMS.kivrim.push(mk('kivrim',{name:f.name,sub:f.extra?'kitap haritasında çizili değil':'',color:C.kivrim,kind:'line',d:f.lines.map(toD).join(''),lon:m[0],lat:m[1]}));});
+  I('volkanik');VOLCANOES.forEach(v=>ITEMS.volkanik.push(mk('volkanik',{name:v[0],color:C.volkanik,kind:'point',marker:'volcano',lon:v[1],lat:v[2],tol:35})));
+  I('fay');FAULTS.forEach(f=>{const m=f.pts[Math.floor(f.pts.length/2)];ITEMS.fay.push(mk('fay',{name:f.name,sub:f.cities.join(', '),color:C.fay,kind:'line',d:toD(f.pts),lon:m[0],lat:m[1],cities:f.cities,nolabel:true}));});
+  I('ova');Object.keys(PLAIN_TYPES).forEach(t=>(BOOK.plains||[]).filter(p=>p.type===t).forEach(p=>ITEMS.ova.push(mk('ova',{name:p.name,group:PLAIN_TYPES[t][0],color:PLAIN_TYPES[t][1],kind:'area',d:p.path,lon:p.lon,lat:p.lat,sub:p.river?p.river+' deltası':(p.mountain?p.mountain+' eteği':'')}))));
+  I('plato');Object.keys(PLATEAU_TYPES).forEach(t=>(BOOK.plateaus||[]).filter(p=>p.type===t).forEach(p=>ITEMS.plato.push(mk('plato',{name:p.name,group:PLATEAU_TYPES[t][0],color:PLATEAU_TYPES[t][1],kind:'area',d:p.path,lon:p.lon,lat:p.lat}))));
+  I('masif');(BOOK.massifs||[]).forEach(p=>ITEMS.masif.push(mk('masif',{name:p.name,color:C.masif,kind:'area',d:p.path,lon:p.lon,lat:p.lat})));
+  I('nehirler');I('akarsular');I('sinir');
+  (OSM.rivers||[]).forEach(r=>{const meta=RIVER_META[r.name]||['kol',''];const base={name:r.name,kind:'line',d:r.path,lon:r.lon,lat:r.lat,basin:meta[1],border:meta[2]};
+    if(meta[0]==='nehir')ITEMS.nehirler.push(mk('nehirler',{...base,color:C.nehirler,sub:meta[1]+' havzası'}));
+    if(meta[0]==='kol')ITEMS.akarsular.push(mk('akarsular',{...base,color:C.akarsular,sub:meta[1]}));
+    if(meta[2])ITEMS.sinir.push(mk('sinir',{...base,color:C.sinir,sub:meta[2]}));});
+  I('goller');Object.keys(LAKE_TYPES).forEach(t=>(OSM.lakes||[]).filter(l=>LAKE_META[l.name]===t).forEach(l=>ITEMS.goller.push(mk('goller',{name:l.name,group:LAKE_TYPES[t],sub:l.real?'':'yaklaşık konum',color:C.goller,kind:'area',d:l.path,lon:l.lon,lat:l.lat,tol:12}))));
+  I('barajlar');(OSM.dams||[]).map(d=>({...d,meta:DAM_META[d.name]||['',0]})).sort((a,b)=>(a.meta[1]||99)-(b.meta[1]||99)).forEach(d=>
+    ITEMS.barajlar.push(mk('barajlar',{name:d.name,group:d.meta[1]?'En büyük 10 baraj':'Diğer barajlar',sub:(d.meta[1]?d.meta[1]+'. · ':'')+d.meta[0],color:C.barajlar,kind:'point',marker:'dam',lon:d.lon,lat:d.lat,tol:25})));
+  I('havza');['açık','kapalı'].forEach(k=>(BOOK.basins||[]).filter(b=>b.kind===k).forEach(b=>ITEMS.havza.push(mk('havza',{name:b.name,group:k==='açık'?'Açık havzalar':'Kapalı havzalar',color:b.color,kind:'area',d:b.path,lon:b.lon,lat:b.lat}))));
+  I('toprak');(BOOK.soils||[]).forEach(s=>ITEMS.toprak.push(mk('toprak',{name:s.name,key:s.key,color:s.color,kind:'area',d:s.path,lon:s.lon,lat:s.lat})));
+  I('deprem');(BOOK.quake||[]).forEach(q=>ITEMS.deprem.push(mk('deprem',{name:q.name,sub:q.desc,color:q.color,kind:'area',d:q.path,lon:q.lon,lat:q.lat})));
+  I('bolge');REGION_GEO.forEach(g=>ITEMS.bolge.push(mk('bolge',{name:g.full,sub:g.cities.length+' il',color:g.color,kind:'area',d:GEO.prov.filter(p=>p.region===g.key).map(p=>p.path).join(''),lon:g.lon,lat:g.lat})));
+  I('iller');GEO.prov.forEach(p=>{const c=ILLER_XY[p.name];ITEMS.iller.push(mk('iller',{name:p.name,group:p.region,color:C.city,kind:'area',d:p.path,lon:c?c[0]:undefined,lat:c?c[1]:undefined,nolabel:true}));});
+  I('komsu');(GEO.neighbors||[]).forEach(n=>ITEMS.komsu.push(mk('komsu',{name:n.name,sub:'kara sınırı',color:C.komsu,kind:'area',d:n.path,lon:n.labelLon,lat:n.labelLat})));
+  I('levha');PLATES.forEach(p=>ITEMS.levha.push(mk('levha',{name:p[0],color:C.levha,kind:'point',marker:'none',lon:p[1],lat:p[2],tol:320})));
+})();
 
 /* ---------- world (haritanın kendisi) ---------- */
+const AREA_STYLE={toprak:[.82,.5],deprem:[.78,.5],havza:[.72,.6],bolge:[.34,.6],komsu:[.2,.7],masif:[.6,.9],plato:[.62,.95],ova:[.62,.95],goller:[.9,1]};
 function buildWorld(){
   let h=`<rect x="-4000" y="-4000" width="9000" height="9000" fill="var(--sea)"/>`;
   h+=`<path d="${GEO.neigh}" fill="var(--neigh)" stroke="var(--border)" stroke-width="0.8" vector-effect="non-scaling-stroke"/>`;
   h+=`<path d="${GEO.tur}" fill="var(--land)" stroke="var(--tur-border)" stroke-width="1.3" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
-  h+=`<defs><clipPath id="turClip"><path d="${GEO.tur}"/></clipPath></defs>`;
-  h+=`<g id="regions" clip-path="url(#turClip)"></g><g id="zones" clip-path="url(#turClip)"></g><g id="neighborShapes"></g><g id="faults"></g>`;
+  h+=`<defs><clipPath id="turClip"><path d="${GEO.tur}"/></clipPath>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="14" height="14" patternTransform="rotate(45)"><rect width="14" height="14" fill="#8FD4F5"/><line x1="0" y1="0" x2="0" y2="14" stroke="#2F6F95" stroke-width="2.2"/></pattern></defs>`;
+  h+=`<g id="fills"></g><g id="lines"></g><g id="qhl"></g><path id="hit" d="" visibility="hidden" fill="#000" stroke="#000" fill-rule="evenodd"/>`;
   world.innerHTML=h;
 }
-function ell(o,fill,stroke,op){const [x,y]=P(o[2],o[3]);return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(o[4]*KY).toFixed(1)}" ry="${(o[5]*KY).toFixed(1)}" transform="rotate(${o[6]} ${x.toFixed(1)} ${y.toFixed(1)})" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-opacity=".75" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>`;}
+function areaSvg(it,op,sop){
+  const fill=it.key==='kirecli'?'url(#hatch)':it.color;
+  return `<path d="${it.d}" fill="${fill}" fill-opacity="${op}" fill-rule="evenodd" stroke="${it.color}" stroke-opacity="${sop}" stroke-width="0.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+}
+const lineSvg=(d,col,w,halo,dash)=>(halo?`<path d="${d}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="${w+2.2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`:'')+
+  `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${dash?`stroke-dasharray="${dash}"`:''} vector-effect="non-scaling-stroke"/>`;
 function buildZones(){
-  document.getElementById('regions').innerHTML = state.on.bolge ? GEO.prov.map(p=>`<path d="${p.path}" fill="${p.color}" fill-opacity=".34" stroke="${p.color}" stroke-opacity=".6" stroke-width="0.7" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`).join('') : '';
-  let z='';
-  if(state.on.masif) MASIF.forEach(o=>z+=ell(o,C.masif,C.masif,.38));
-  if(state.on.ova){OVA.forEach(o=>z+=ell(o,'#5FA267','#2F6B3A',.38));PLATO.forEach(o=>z+=ell(o,'#E2B265','#8C6420',.42));}
-  if(state.on.goller){
-    LAKES.forEach(l=>{if(l.real){z+=`<path d="${l.path}" fill="#4FA8D8" fill-opacity=".85" stroke="${C.goller}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;}
-      else{z+=ell(['',0,l.lon,l.lat,l.rx,l.ry,l.ang],'#4FA8D8',C.goller,.75);}});
-  }
-  const riverPath=(r)=>`M${r.pts.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(',')).join('L')}`;
-  if(state.on.nehirler) RIVERS.forEach(r=>{z+=`<path d="${riverPath(r)}" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path d="${riverPath(r)}" fill="none" stroke="${C.nehirler}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;});
-  if(state.on.akarsular) STREAMS.forEach(r=>{z+=`<path d="${riverPath(r)}" fill="none" stroke="${C.akarsular}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;});
-  document.getElementById('zones').innerHTML=z;
-  document.getElementById('neighborShapes').innerHTML=state.on.komsu ? NEIGHBORS.map(n=>`<path d="${n.path}" fill="${n.color}" fill-opacity=".2" stroke="#58717F" stroke-opacity=".7" stroke-width="0.8" vector-effect="non-scaling-stroke"/>`).join('') : '';
   let f='';
-  if(state.on.fay) FAULTS.forEach(fl=>{const d='M'+fl.pts.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(',')).join('L');
-    f+=`<path d="${d}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path d="${d}" fill="none" stroke="${C.fay}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;});
-  document.getElementById('faults').innerHTML=f;
+  ['toprak','deprem','havza'].forEach(l=>{if(state.on[l])ITEMS[l].forEach(it=>f+=areaSvg(it,...AREA_STYLE[l]));});
+  if(state.on.bolge) f+=GEO.prov.map(p=>`<path d="${p.path}" fill="${p.color}" fill-opacity=".34" stroke="${p.color}" stroke-opacity=".6" stroke-width="0.7" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`).join('');
+  if(state.on.iller&&!state.on.bolge) f+=GEO.prov.map(p=>`<path d="${p.path}" fill="none" stroke="#7E907E" stroke-opacity=".55" stroke-width="0.6" vector-effect="non-scaling-stroke"/>`).join('');
+  let g='';
+  if(state.on.komsu) ITEMS.komsu.forEach(it=>g+=`<path d="${it.d}" fill="#6D8594" fill-opacity=".2" stroke="#58717F" stroke-opacity=".7" stroke-width="0.8" vector-effect="non-scaling-stroke"/>`);
+  ['masif','plato','ova','goller'].forEach(l=>{if(state.on[l])ITEMS[l].forEach(it=>f+=areaSvg(it,...AREA_STYLE[l]));});
+  document.getElementById('fills').innerHTML=f;
+  if(state.on.akarsular) ITEMS.akarsular.forEach(it=>g+=lineSvg(it.d,C.akarsular,1.5));
+  if(state.on.nehirler) ITEMS.nehirler.forEach(it=>g+=lineSvg(it.d,C.nehirler,2.2,true));
+  if(state.on.sinir) ITEMS.sinir.forEach(it=>g+=lineSvg(it.d,C.sinir,3.2,true,'7 4'));
+  if(state.on.fay) ITEMS.fay.forEach(it=>g+=lineSvg(it.d,C.fay,2.4,true));
+  if(state.on.kivrim) ITEMS.kivrim.forEach(it=>g+=lineSvg(it.d,C.kivrim,4.2,true));
+  if(state.on.kirik) ITEMS.kirik.filter(it=>it.kind==='line').forEach(it=>g+=lineSvg(it.d,C.kirik,4.2,true));
+  document.getElementById('lines').innerHTML=g;
+  // clip ile Türkiye dışına taşan kitap poligonlarını kes
+  document.getElementById('fills').setAttribute('clip-path','url(#turClip)');
 }
 
 /* ---------- etiketler (ekran koordinatı) ---------- */
 function overlap(a,b){return !(a.x2<b.x1||a.x1>b.x2||a.y2<b.y1||a.y1>b.y2);}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+const MARKER={
+  volcano:(x,y,c)=>`<path d="M${x},${y-6}L${x+6.5},${y+5}H${x-6.5}Z" fill="${c}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>`,
+  graben:(x,y,c)=>`<path d="M${x-6.5},${y-5}H${x+6.5}L${x},${y+6}Z" fill="${c}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>`,
+  dam:(x,y,c)=>`<rect x="${x-4.5}" y="${y-4.5}" width="9" height="9" rx="1.5" fill="${c}" stroke="#fff" stroke-width="1.4"/>`,
+  none:()=>''
+};
+const LABEL_ORDER=['bolge','levha','volkanik','barajlar','kirik','kivrim','masif','plato','ova','goller','nehirler','sinir','akarsular','havza','toprak','deprem','komsu'];
 function renderOverlay(){
   const placed=[]; let out=''; let hidden=0;
   const labelsOn=!QUIZ.active;
   const inView=(x,y,m=60)=>x>-m&&x<W+m&&y>-m&&y<H+m;
   const free=(r)=>r.x1>4&&r.x2<W-4&&r.y1>4&&r.y2<H-4&&!placed.some(p=>overlap(r,p));
-  const blockOf=(lines)=>{let w=0,h=0;lines.forEach(l=>{w=Math.max(w,tw(l.t,l.s,l.w,l.i,l.ls));h+=l.s+2;});return {w,h:h};};
-  const draw=(lines,x1,y1,anchor,bw)=>{ // x1,y1 = sol üst köşe
-    let y=y1,s='';
-    lines.forEach(l=>{y+=l.s;const tx=anchor==='start'?x1:anchor==='end'?x1+bw:x1+bw/2;
-      s+=`<text x="${tx.toFixed(1)}" y="${(y-l.s*0.18).toFixed(1)}" text-anchor="${anchor}" class="lb" font-size="${l.s}" font-weight="${l.w}" ${l.i?'font-style="italic"':''} ${l.ls?`letter-spacing="${l.ls}"`:''} fill="${l.c}">${esc(l.t)}</text>`;y+=2;});
-    return s;};
-  // marker rezervasyonları
+  const txt=(t,x,y,s,w,c,it,anchor)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor||'start'}" class="lb" font-size="${s}" font-weight="${w}" ${it?'font-style="italic"':''} fill="${c}">${esc(t)}</text>`;
+  // aday konumlardan ilk boş olana etiket koy. cands: [dx,dy,leader?] (kutunun sol üst köşesi = x+dx, y+dy)
+  function label(t,x,y,col,opt={}){
+    const s=opt.size||12,w=opt.weight||700,bw=tw(t,s,w,opt.italic),bh=s+2;
+    const c=opt.cands||[[9,-bh/2],[-9-bw,-bh/2],[-bw/2,-bh-8],[-bw/2,8],[24,-bh/2-14,1],[-24-bw,-bh/2+14,1],[-bw/2,-bh-26,1],[-bw/2,26,1]];
+    for(const [dx,dy,lead] of c){const r={x1:x+dx-2,y1:y+dy-1,x2:x+dx+bw+2,y2:y+dy+bh+1};
+      if(free(r)){placed.push(r);
+        if(lead){const lx=Math.min(Math.max(x,x+dx),x+dx+bw),ly=Math.min(Math.max(y,y+dy),y+dy+bh);out+=`<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${col}" stroke-opacity=".7" stroke-width="1"/>`;}
+        out+=txt(t,x+dx,y+dy+s*.84,s,w,col,opt.italic);return true;}}
+    hidden++;return false;
+  }
+  const centered=(bw,bh)=>[[-bw/2,-bh/2],[-bw/2,-bh/2-bh-4],[-bw/2,bh/2+4],[-bw/2,-bh/2-34,1],[-bw/2,bh/2+30,1],[16,-bh/2-24,1],[-bw-16,-bh/2-24,1]];
+  // şehir ve nokta işaretleri önce yer ayırır
   const cityVisible=new Map();
-  const faultOva=state.cities&&(state.on.fay||state.on.ova);
-  const wantCities=faultOva||state.on.iller;
-  if(wantCities){
-    const names=new Set();
-    if(faultOva&&state.on.fay) FAULTS.forEach(f=>f.cities.forEach(c=>names.add(c)));
-    if(faultOva&&state.on.ova){OVA.concat(PLATO).forEach(o=>o[7].forEach(c=>names.add(c)));}
-    if(state.on.iller) ILLER.forEach(c=>names.add(c));
-    names.forEach(n=>{const c=CITY[n];if(!c)return;const [wx,wy]=P(c[0],c[1]);const x=sx(wx),y=sy(wy);if(inView(x,y))cityVisible.set(n,[x,y]);});
+  if(state.on.fay&&state.cities){
+    ITEMS.fay.forEach(f=>f.cities.forEach(n=>{const c=CITY[n];if(!c||cityVisible.has(n))return;const [wx,wy]=P(c[0],c[1]);const x=sx(wx),y=sy(wy);if(inView(x,y))cityVisible.set(n,[x,y]);}));
     cityVisible.forEach(([x,y])=>placed.push({x1:x-3.5,y1:y-3.5,x2:x+3.5,y2:y+3.5}));
   }
-  // dağ işaretleri
-  const mts=MOUNTAINS.filter(m=>state.on[m[1]]);
-  const mpos=mts.map(m=>{const [wx,wy]=P(m[2],m[3]);return [m,sx(wx),sy(wy)];}).filter(([m,x,y])=>inView(x,y));
-  mpos.forEach(([m,x,y])=>placed.push({x1:x-7,y1:y-7,x2:x+7,y2:y+7}));
-  // göl işaretleri
-  const lpos = state.on.goller ? LAKES.map(l=>{const [wx,wy]=P(l.lon,l.lat);return [l,sx(wx),sy(wy)];}).filter(([l,x,y])=>inView(x,y)) : [];
-  lpos.forEach(([l,x,y])=>placed.push({x1:x-6,y1:y-6,x2:x+6,y2:y+6}));
-  // 0) bölgeler
-  if(state.on.bolge&&labelsOn) REGION_GEO.forEach(g=>{const x=sx(g.cx),y=sy(g.cy);if(!inView(x,y,150))return;
-    const fs=W<480?10.5:12.5;const l=[{t:g.full.toUpperCase(),s:fs,w:800,i:false,ls:W<480?0.6:1.2,c:g.color}];const b=blockOf(l);
-    const cands=[[x-b.w/2,y-b.h/2],[x-b.w/2,y-b.h/2-34],[x-b.w/2,y-b.h/2+34],[x-b.w/2-56,y-b.h/2],[x-b.w/2+56,y-b.h/2],
-      [x-b.w/2,y-b.h/2-64],[x-b.w/2,y-b.h/2+64],[x-b.w/2-56,y-b.h/2-34],[x-b.w/2+56,y-b.h/2-34],[x-b.w/2-56,y-b.h/2+34],[x-b.w/2+56,y-b.h/2+34]];
-    let pick=null;for(const c of cands){const r={x1:c[0]-3,y1:c[1]-2,x2:c[0]+b.w+3,y2:c[1]+b.h+2};if(free(r)){pick=c;placed.push(r);break;}}
-    if(!pick){pick=cands[0];placed.push({x1:pick[0]-3,y1:pick[1]-2,x2:pick[0]+b.w+3,y2:pick[1]+b.h+2});}
-    out+=draw(l,pick[0],pick[1],'start',b.w);});
-  // 1) levhalar
-  if(state.on.levha&&labelsOn) PLATES.forEach(p=>{const [wx,wy]=P(p[1],p[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,200))return;
-    const l=[{t:p[0],s:17,w:700,i:false,ls:2.5,c:C.levha}];const b=blockOf(l);out+=draw(l,x-b.w/2,y-b.h/2,'middle',b.w);placed.push({x1:x-b.w/2,y1:y-b.h/2,x2:x+b.w/2,y2:y+b.h/2});});
-  // 4) şehirler
-  if(wantCities){
-    const order=[];
-    if(faultOva&&state.on.fay) FAULTS.forEach(f=>f.cities.forEach(c=>order.push(c)));
-    if(faultOva&&state.on.ova) OVA.concat(PLATO).forEach(o=>o[7].forEach(c=>order.push(c)));
-    if(state.on.iller) ILLER.forEach(c=>order.push(c));
-    const seen=new Set();
-    order.forEach(n=>{if(seen.has(n)||!cityVisible.has(n))return;seen.add(n);
-      const [x,y]=cityVisible.get(n);const onFault=faultOva&&state.on.fay&&FAULTS.some(f=>f.cities.includes(n));
-      out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${C.city}" stroke="${onFault?C.fay:'#fff'}" stroke-width="1.6"/>`;
-      if(!labelsOn)return;
-      const l=[{t:n,s:10.5,w:700,i:false,c:C.city}];const b=blockOf(l);
-      const cands=[[x+7,y-b.h/2],[x-7-b.w,y-b.h/2],[x-b.w/2,y-b.h-6],[x-b.w/2,y+6],[x+7,y-b.h-3],[x+7,y+3]];
-      let ok=null;for(const c of cands){const r={x1:c[0]-2,y1:c[1]-1,x2:c[0]+b.w+2,y2:c[1]+b.h+1};if(free(r)){ok=c;placed.push(r);break;}}
-      if(ok)out+=draw(l,ok[0],ok[1],'start',b.w);else hidden++;});
+  const pts=[];
+  ['volkanik','barajlar','kirik'].forEach(l=>{if(state.on[l])ITEMS[l].filter(it=>it.kind==='point').forEach(it=>{const x=sx(it.wx),y=sy(it.wy);if(inView(x,y)){pts.push([it,x,y]);placed.push({x1:x-6,y1:y-6,x2:x+6,y2:y+6});}});});
+  pts.forEach(([it,x,y])=>out+=MARKER[it.marker](x,y,it.color));
+  cityVisible.forEach(([x,y])=>out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${C.city}" stroke="${C.fay}" stroke-width="1.6"/>`);
+  if(labelsOn){
+    LABEL_ORDER.forEach(l=>{if(!state.on[l])return;
+      ITEMS[l].forEach(it=>{if(it.nolabel)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,100))return;
+        if(l==='bolge'){const s=W<480?10.5:12.5,t=it.name.toUpperCase(),bw=tw(t,s,800)+t.length*1.2;label(t,x,y,it.color,{size:s,weight:800,cands:centered(bw,s+2)});return;}
+        if(l==='levha'){const t=it.name,bw=tw(t,15,700);label(t,x,y,C.levha,{size:15,cands:centered(bw,17)});return;}
+        const s=l==='akarsular'||l==='sinir'?11:(it.kind==='area'&&(l==='toprak'||l==='deprem'||l==='havza')?11.5:12);
+        const col=l==='toprak'||l==='deprem'||l==='havza'?'#243038':(l==='ova'||l==='plato'?shade(it.color):it.color);
+        const italic=l==='nehirler'||l==='akarsular'||l==='sinir';
+        if(it.kind==='area'){const bw=tw(it.name,s,700,italic);label(it.name,x,y,col,{size:s,italic,cands:centered(bw,s+2)});}
+        else label(it.name,x,y,col,{size:s,italic});
+      });});
+    cityVisible.forEach(([x,y],n)=>label(n,x,y,C.city,{size:10.5,cands:[[7,-6.5],[-7-tw(n,10.5,700),-6.5],[-tw(n,10.5,700)/2,-18],[-tw(n,10.5,700)/2,6]]}));
+    SEAS.forEach(s=>{const [wx,wy]=P(s[1],s[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,100))return;const bw=tw(s[0],12,500,true);const r={x1:x-bw/2,y1:y-7,x2:x+bw/2,y2:y+7};
+      if(free(r)){placed.push(r);out+=txt(s[0],x,y+4,12,500,C.sea,true,'middle');}});
   }
-  // 2) masif / ova / plato merkezli bloklar
-  const zoneItems=[];
-  if(state.on.masif) MASIF.forEach(o=>zoneItems.push([o,C.masif,[]]));
-  if(state.on.ova){OVA.forEach(o=>zoneItems.push([o,C.ova,o[7]]));PLATO.forEach(o=>zoneItems.push([o,C.plato,o[7]]));}
-  if(labelsOn) zoneItems.forEach(([o,col])=>{const [wx,wy]=P(o[2],o[3]);const x=sx(wx),y=sy(wy);if(!inView(x,y,120))return;
-    const lines=[{t:o[0],s:12.5,w:700,i:false,c:col}];const b=blockOf(lines);
-    const cands=[[0,0],[0,-b.h-6],[0,b.h+6],[b.w*0.55,0],[-b.w*0.55,0],[b.w*0.55,-b.h-4],[-b.w*0.55,-b.h-4],[b.w*0.55,b.h+4],[-b.w*0.55,b.h+4],
-      [0,-b.h-30,1],[0,b.h+30,1],[b.w*0.6+20,-b.h,1],[-b.w*0.6-20,-b.h,1],[b.w*0.6+20,b.h,1],[-b.w*0.6-20,b.h,1],[0,-2*b.h-40,1],[0,2*b.h+40,1]];
-    let pick=null;for(const c of cands){const r={x1:x+c[0]-b.w/2-2,y1:y+c[1]-b.h/2-2,x2:x+c[0]+b.w/2+2,y2:y+c[1]+b.h/2+2};if(free(r)){pick=c;placed.push(r);break;}}
-    if(!pick){pick=cands[0];placed.push({x1:x-b.w/2,y1:y-b.h/2,x2:x+b.w/2,y2:y+b.h/2});}
-    if(pick[2]){const lx=Math.min(Math.max(x,x+pick[0]-b.w/2),x+pick[0]+b.w/2),ly=Math.min(Math.max(y,y+pick[1]-b.h/2),y+pick[1]+b.h/2);
-      out+=`<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${col}" stroke-opacity=".75" stroke-width="1"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${col}"/>`;}
-    out+=draw(lines,x+pick[0]-b.w/2,y+pick[1]-b.h/2,'middle',b.w);});
-  // 3) dağ etiketleri
-  mpos.forEach(([m,x,y])=>{const col=C[m[1]];
-    const marker=m[4]==='graben'?`M${x-6.5},${y-5}H${x+6.5}L${x},${y+6}Z`:`M${x},${y-6}L${x+6.5},${y+5}H${x-6.5}Z`;
-    out+=`<path d="${marker}" fill="${col}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>`;
-    if(!labelsOn)return;
-    const l=[{t:m[0],s:12.5,w:700,i:false,c:col}];const b=blockOf(l);
-    const h2=b.h/2;
-    const cands=[[x+9,y-h2],[x-9-b.w,y-h2],[x-b.w/2,y-b.h-8],[x-b.w/2,y+8],[x+7,y-b.h-6],[x-7-b.w,y-b.h-6],[x+7,y+6],[x-7-b.w,y+6],
-      [x+34,y-h2-16,1],[x+34,y-h2+16,1],[x-34-b.w,y-h2-16,1],[x-34-b.w,y-h2+16,1],[x-b.w/2,y-b.h-30,1],[x-b.w/2,y+30,1],[x+40,y-h2-34,1],[x-40-b.w,y-h2+34,1],[x+40,y-h2+34,1],[x-40-b.w,y-h2-34,1]];
-    let pick=null;for(const c of cands){const r={x1:c[0]-2,y1:c[1]-1,x2:c[0]+b.w+2,y2:c[1]+b.h+1};if(free(r)){pick=c;placed.push(r);break;}}
-    if(pick){if(pick[2]){const lx=Math.min(Math.max(x,pick[0]),pick[0]+b.w),ly=Math.min(Math.max(y,pick[1]),pick[1]+b.h);
-        out+=`<line x1="${x}" y1="${y}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${col}" stroke-opacity=".7" stroke-width="1"/>`;}
-      out+=draw(l,pick[0],pick[1],'start',b.w);}else hidden++;});
-  // 3b) göl etiketleri
-  lpos.forEach(([l,x,y])=>{
-    out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="#4FA8D8" stroke="${C.goller}" stroke-width="1.4"/>`;
-    if(!labelsOn)return;
-    const ll=[{t:l.name,s:12,w:700,i:false,c:C.goller}];const b=blockOf(ll);const h2=b.h/2;
-    const cands=[[x+9,y-h2],[x-9-b.w,y-h2],[x-b.w/2,y-b.h-8],[x-b.w/2,y+8],[x+34,y-h2-16,1],[x-34-b.w,y-h2+16,1]];
-    let pick=null;for(const c of cands){const r={x1:c[0]-2,y1:c[1]-1,x2:c[0]+b.w+2,y2:c[1]+b.h+1};if(free(r)){pick=c;placed.push(r);break;}}
-    if(pick){if(pick[2]){const lx=Math.min(Math.max(x,pick[0]),pick[0]+b.w),ly=Math.min(Math.max(y,pick[1]),pick[1]+b.h);
-        out+=`<line x1="${x}" y1="${y}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${C.goller}" stroke-opacity=".7" stroke-width="1"/>`;}
-      out+=draw(ll,pick[0],pick[1],'start',b.w);}else hidden++;});
-  // 3c) komşu ülke etiketleri
-  if(state.on.komsu&&labelsOn) NEIGHBORS.forEach(n=>{
-    const x=sx(n.cx),y=sy(n.cy);if(!inView(x,y,120))return;
-    const l=[{t:n.name,s:11.5,w:700,i:false,c:'#385565'}];const b=blockOf(l);const h2=b.h/2;
-    const cands=[[x-b.w/2,y-h2],[x-b.w/2,y-h2-24],[x-b.w/2,y+h2+8],[x+8,y-h2],[x-8-b.w,y-h2]];
-    let pick=null;for(const c of cands){const r={x1:c[0]-2,y1:c[1]-1,x2:c[0]+b.w+2,y2:c[1]+b.h+1};if(free(r)){pick=c;placed.push(r);break;}}
-    if(pick)out+=draw(l,pick[0],pick[1],'start',b.w);else hidden++;
-  });
-  const riverLabels=(state.on.nehirler?RIVERS:[]).concat(state.on.akarsular?STREAMS:[]);
-  riverLabels.forEach(r=>{
-    const p=r.pts[Math.floor(r.pts.length/2)], [wx,wy]=P(p[0],p[1]), x=sx(wx), y=sy(wy);
-    if(!inView(x,y,80)||!labelsOn)return;
-    const col=RIVERS.includes(r)?C.nehirler:C.akarsular;
-    const ll=[{t:r.name,s:11.5,w:700,i:true,c:col}],b=blockOf(ll);
-    const rbox={x1:x-b.w/2-2,y1:y-b.h/2-1,x2:x+b.w/2+2,y2:y+b.h/2+1};
-    if(free(rbox)){placed.push(rbox);out+=draw(ll,x-b.w/2,y-b.h/2,'start',b.w);}
-  });
-  // 5) deniz adları
-  SEAS.forEach(s=>{const [wx,wy]=P(s[1],s[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,100))return;
-    const l=[{t:s[0],s:12,w:500,i:true,ls:2.5,c:C.sea}];const b=blockOf(l);const r={x1:x-b.w/2,y1:y-b.h/2,x2:x+b.w/2,y2:y+b.h/2};
-    if(free(r)){out+=draw(l,x-b.w/2,y-b.h/2,'middle',b.w);placed.push(r);}});
-  // 6) quiz işaretleri
+  // quiz işaretleri
   if(QUIZ.active&&QUIZ.answered&&QUIZ.guess){
-    const [gx,gy]=P(QUIZ.guess[0],QUIZ.guess[1]),[tx,ty]=P(QUIZ.target.lon,QUIZ.target.lat);
-    const gsx=sx(gx),gsy=sy(gy),tsx=sx(tx),tsy=sy(ty);
-    out+=`<line x1="${gsx.toFixed(1)}" y1="${gsy.toFixed(1)}" x2="${tsx.toFixed(1)}" y2="${tsy.toFixed(1)}" stroke="#333" stroke-width="1.4" stroke-dasharray="4 3"/>`;
-    out+=`<g stroke="#fff" stroke-width="1.6"><path d="M${gsx-7},${gsy-7}L${gsx+7},${gsy+7}M${gsx-7},${gsy+7}L${gsx+7},${gsy-7}" stroke="#C62828" stroke-width="3.2" stroke-linecap="round"/></g>`;
-    out+=`<circle cx="${tsx.toFixed(1)}" cy="${tsy.toFixed(1)}" r="8" fill="none" stroke="#1E8F4E" stroke-width="3"/><circle cx="${tsx.toFixed(1)}" cy="${tsy.toFixed(1)}" r="2.4" fill="#1E8F4E"/>`;
+    const t=QUIZ.target,gx=sx(QUIZ.guess[0]),gy=sy(QUIZ.guess[1]);
+    if(t.kind==='point'){const tx=sx(t.wx),ty=sy(t.wy);
+      out+=`<line x1="${gx.toFixed(1)}" y1="${gy.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" stroke="#333" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+      out+=`<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="9" fill="none" stroke="#1E8F4E" stroke-width="3"/><circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="2.6" fill="#1E8F4E"/>`;}
+    else if(QUIZ.near){const nx=sx(QUIZ.near[0]),ny=sy(QUIZ.near[1]);if(!QUIZ.ok)out+=`<line x1="${gx.toFixed(1)}" y1="${gy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#333" stroke-width="1.4" stroke-dasharray="4 3"/>`;}
+    out+=QUIZ.ok?`<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="6" fill="#1E8F4E" stroke="#fff" stroke-width="2"/>`:
+      `<path d="M${gx-7},${gy-7}L${gx+7},${gy+7}M${gx-7},${gy+7}L${gx+7},${gy-7}" stroke="#C62828" stroke-width="3.2" stroke-linecap="round"/>`;
   }
   over.innerHTML=out;
   note.textContent=hidden>0?`${hidden} ad sığmadığı için gizlendi. Yakınlaştırınca görünür.`:'';
   note.hidden=hidden===0||QUIZ.active;
 }
+function shade(hex){const n=parseInt(hex.slice(1),16);const f=.62;return '#'+[n>>16,(n>>8)&255,n&255].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('');}
 
 /* ---------- görünüm ---------- */
 function apply(){world.setAttribute('transform',`translate(${state.tx.toFixed(2)} ${state.ty.toFixed(2)}) scale(${S().toFixed(4)})`);}
 let raf=0;function draw(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;apply();renderOverlay();});}
 function resize(){const r=svg.getBoundingClientRect();W=Math.max(300,r.width);H=Math.max(300,r.height);svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  const oldFit=fit;fit=Math.min(W/REG.w,H/REG.h)*0.98;if(!resize.done||state.k===1){resetView();resize.done=true;}else{draw();}}
+  fit=Math.min(W/REG.w,H/REG.h)*0.98;if(!resize.done||state.k===1){resetView();resize.done=true;}else{draw();}}
 function home(){return [1,W/2-REG.cx*fit,H/2-REG.cy*fit];}
 function resetView(){const h=home();state.k=1;state.tx=h[1];state.ty=h[2];draw();}
-function zoomAt(f,cx,cy){const nk=Math.min(14,Math.max(1,state.k*f));const r=nk/state.k;state.tx=cx-(cx-state.tx)*r;state.ty=cy-(cy-state.ty)*r;state.k=nk;draw();}
+function zoomAt(f,cx,cy){const nk=Math.min(20,Math.max(1,state.k*f));const r=nk/state.k;state.tx=cx-(cx-state.tx)*r;state.ty=cy-(cy-state.ty)*r;state.k=nk;draw();}
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function animateTo(k,tx,ty){if(reduce){state.k=k;state.tx=tx;state.ty=ty;draw();return;}
   const k0=state.k,x0=state.tx,y0=state.ty,t0=performance.now();(function step(t){const u=Math.min(1,(t-t0)/380),e=1-Math.pow(1-u,3);
     state.k=k0+(k-k0)*e;state.tx=x0+(tx-x0)*e;state.ty=y0+(ty-y0)*e;apply();renderOverlay();if(u<1)requestAnimationFrame(step);})(t0);}
-function focusOn(pts,minK){let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;pts.forEach(p=>{const [x,y]=P(p[0],p[1]);x1=Math.min(x1,x);x2=Math.max(x2,x);y1=Math.min(y1,y);y2=Math.max(y2,y);});
-  const w=Math.max(x2-x1,90),h=Math.max(y2-y1,70);let k=Math.min(W/(w*fit*1.5),H/(h*fit*1.5));k=pts.length===1?(minK||3):Math.min(10,Math.max(1,k));
-  const s=fit*k;animateTo(k,W/2-(x1+x2)/2*s,H/2-(y1+y2)/2*s);
-  if(matchMedia('(max-width:900px)').matches){
-    document.getElementById('stage').scrollIntoView({block:'start',behavior:reduce?'auto':'smooth'});
-  }}
+function focusBox(b,minK){
+  const w=Math.max(b[2]-b[0],90),h=Math.max(b[3]-b[1],70);
+  let k=Math.min(W/(w*fit*1.6),H/(h*fit*1.6));k=Math.min(minK||6,Math.max(1,k));
+  const s=fit*k;animateTo(k,W/2-(b[0]+b[2])/2*s,H/2-(b[1]+b[3])/2*s);
+  if(matchMedia('(max-width:900px)').matches)document.getElementById('stage').scrollIntoView({block:'start',behavior:reduce?'auto':'smooth'});
+}
 
 /* ---------- etkileşim ---------- */
-const ptrs=new Map();let lastD=0,downPt=null,moveDist=0;
-svg.addEventListener('pointerdown',e=>{svg.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);lastD=0;svg.classList.add('drag');
-  if(ptrs.size===1){downPt=[e.clientX,e.clientY];moveDist=0;}});
+const ptrs=new Map();let lastD=0,moveDist=0;
+svg.addEventListener('pointerdown',e=>{try{svg.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);lastD=0;svg.classList.add('drag');if(ptrs.size===1)moveDist=0;});
 svg.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);
   if(ptrs.size===1){const dx=e.clientX-p[0],dy=e.clientY-p[1];state.tx+=dx;state.ty+=dy;ptrs.set(e.pointerId,[e.clientX,e.clientY]);moveDist+=Math.hypot(dx,dy);draw();}
   else if(ptrs.size===2){ptrs.set(e.pointerId,[e.clientX,e.clientY]);const [a,b]=[...ptrs.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);const r=svg.getBoundingClientRect();
-    if(lastD)zoomAt(d/lastD,(a[0]+b[0])/2-r.left,(a[1]+b[1])/2-r.top);lastD=d;}});
+    if(lastD)zoomAt(d/lastD,(a[0]+b[0])/2-r.left,(a[1]+b[1])/2-r.top);lastD=d;moveDist+=10;}});
 const up=e=>{const wasSingle=ptrs.size===1;ptrs.delete(e.pointerId);lastD=0;if(!ptrs.size)svg.classList.remove('drag');
-  if(wasSingle&&QUIZ.active&&!QUIZ.answered&&moveDist<6){const r=svg.getBoundingClientRect();submitGuess(e.clientX-r.left,e.clientY-r.top);}
+  if(wasSingle&&QUIZ.active&&!QUIZ.answered&&QUIZ.target&&moveDist<6){const r=svg.getBoundingClientRect();submitGuess(e.clientX-r.left,e.clientY-r.top);}
   moveDist=0;};
 svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
 svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*0.0016),e.clientX-r.left,e.clientY-r.top);},{passive:false});
@@ -230,155 +211,173 @@ svg.addEventListener('keydown',e=>{const st=60;if(e.key==='+'||e.key==='=')zoomA
   else if(e.key==='ArrowLeft')state.tx+=st;else if(e.key==='ArrowRight')state.tx-=st;else if(e.key==='ArrowUp')state.ty+=st;else if(e.key==='ArrowDown')state.ty-=st;else return;e.preventDefault();draw();});
 
 /* ---------- panel: katmanlar ---------- */
-const swatch={kirik:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8 1L15 13H1Z" fill="${C.kirik}"/></svg>`,kivrim:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8 1L15 13H1Z" fill="${C.kivrim}"/></svg>`,volkanik:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8 1L15 13H1Z" fill="${C.volkanik}"/></svg>`,
- fay:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 12L6 6L10 9L15 2" fill="none" stroke="${C.fay}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
- ova:`<svg width="16" height="14" viewBox="0 0 16 14"><ellipse cx="6" cy="7" rx="5" ry="4" fill="#5FA267" fill-opacity=".7" stroke="#2F6B3A" stroke-dasharray="2 1.5"/><ellipse cx="11" cy="8" rx="4" ry="3.5" fill="#E2B265" fill-opacity=".8" stroke="#8C6420" stroke-dasharray="2 1.5"/></svg>`,
- masif:`<svg width="16" height="14" viewBox="0 0 16 14"><ellipse cx="8" cy="7" rx="7" ry="5" fill="${C.masif}" fill-opacity=".7" stroke="${C.masif}" stroke-dasharray="2 1.5"/></svg>`,
- iller:`<svg width="16" height="14" viewBox="0 0 16 14"><circle cx="5" cy="5" r="2.4" fill="#22303B"/><circle cx="11" cy="8" r="2.4" fill="#22303B"/><circle cx="5" cy="11" r="2" fill="#22303B"/></svg>`,
- bolge:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M2 9 Q1 3 8 3 Q15 3 14 9 Q13 12 8 12 Q3 12 2 9Z" fill="#3D6EA5" fill-opacity=".45" stroke="#3D6EA5" stroke-dasharray="2 1.3"/></svg>`,
- goller:`<svg width="16" height="14" viewBox="0 0 16 14"><ellipse cx="8" cy="8" rx="6.5" ry="4.5" fill="#4FA8D8" fill-opacity=".85" stroke="${C.goller}"/></svg>`,
- nehirler:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 11C5 2 10 13 15 3" fill="none" stroke="${C.nehirler}" stroke-width="2.5"/></svg>`,
- akarsular:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 11C5 2 10 13 15 3" fill="none" stroke="${C.akarsular}" stroke-width="1.8"/></svg>`,
- levha:`<svg width="16" height="14" viewBox="0 0 16 14"><text x="8" y="11" text-anchor="middle" font-size="12" font-weight="700" fill="#9FC2DD" font-family="serif">L</text></svg>`,
- komsu:`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 3h14v8H1Z" fill="#6D8594" fill-opacity=".35" stroke="#58717F"/></svg>`};
-const LAYERS=[['kirik','Kırık dağlar','koyu sarı'],['kivrim','Kıvrım dağlar','kahverengi'],['volkanik','Volkanik dağlar','kırmızı'],['fay','Fay hatları','şehirlerle'],['ova','Ova ve platolar','bölge ve şehirlerle'],['masif','Masifler','koyu kahverengi'],['nehirler','Nehirler','başlıca akarsular'],['akarsular','Akarsular','nehir kolları'],['goller','Göller','doğal göller'],['bolge','Bölgeler','il sınırlarıyla'],['komsu','Komşularımız','8 ülke · Natural Earth'],['levha','Levhalar','yalnızca isim'],['iller','Tüm iller','81 il adı']];
+const sw=(inner)=>`<svg width="16" height="14" viewBox="0 0 16 14">${inner}</svg>`;
+const tri=c=>`<path d="M8 1L15 13H1Z" fill="${c}"/>`;
+const wave=(c,w,dash)=>`<path d="M1 11C5 2 10 13 15 3" fill="none" stroke="${c}" stroke-width="${w}" ${dash?'stroke-dasharray="3 2"':''}/>`;
+const blob=(a,b)=>`<ellipse cx="6" cy="7" rx="5" ry="4" fill="${a}" fill-opacity=".8"/><ellipse cx="11" cy="8" rx="4" ry="3.5" fill="${b}" fill-opacity=".85"/>`;
+const swatch={kirik:sw(`<path d="M2 11L14 4" stroke="${C.kirik}" stroke-width="3.2" stroke-linecap="round"/>`),kivrim:sw(`<path d="M1 10Q8 2 15 8" fill="none" stroke="${C.kivrim}" stroke-width="3.2" stroke-linecap="round"/>`),volkanik:sw(tri(C.volkanik)),
+ fay:sw(`<path d="M1 12L6 6L10 9L15 2" fill="none" stroke="${C.fay}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`),
+ ova:sw(blob('#B06FB3','#4FA06A')),plato:sw(blob('#A56BC4','#E8706C')),masif:sw(`<ellipse cx="8" cy="7" rx="7" ry="5" fill="${C.masif}" fill-opacity=".8"/>`),
+ nehirler:sw(wave(C.nehirler,2.5)),akarsular:sw(wave(C.akarsular,1.6)),sinir:sw(wave(C.sinir,2.6,true)),
+ goller:sw(`<ellipse cx="8" cy="8" rx="6.5" ry="4.5" fill="#4FA8D8" stroke="${C.goller}"/>`),barajlar:sw(`<rect x="4" y="3" width="8" height="8" rx="1.5" fill="${C.barajlar}"/>`),
+ havza:sw(blob('#BDE7E1','#F1C8B6')),toprak:sw(blob('#EF8A8F','#EEEE9A')),deprem:sw(blob('#EF8A63','#C09CCC')),
+ bolge:sw(`<path d="M2 9 Q1 3 8 3 Q15 3 14 9 Q13 12 8 12 Q3 12 2 9Z" fill="#3D6EA5" fill-opacity=".45" stroke="#3D6EA5" stroke-dasharray="2 1.3"/>`),
+ iller:sw(`<circle cx="5" cy="5" r="2.4" fill="#22303B"/><circle cx="11" cy="8" r="2.4" fill="#22303B"/><circle cx="5" cy="11" r="2" fill="#22303B"/>`),
+ komsu:sw(`<path d="M1 3h14v8H1Z" fill="#6D8594" fill-opacity=".35" stroke="#58717F"/>`),
+ levha:sw(`<text x="8" y="11" text-anchor="middle" font-size="12" font-weight="700" fill="#9FC2DD" font-family="serif">L</text>`)};
+const LAYERS=[
+ ['Yer şekilleri',[['kirik','Kırık dağlar','horst · graben'],['kivrim','Kıvrım dağları','kitap s.55'],['volkanik','Volkanik dağlar','kitap s.57'],['fay','Fay hatları','şehirlerle'],['ova','Ovalar','6 oluşum türü'],['plato','Platolar','5 tür'],['masif','Masifler','kitap s.21']]],
+ ['Su',[['nehirler','Nehirler','gerçek güzergâh'],['akarsular','Kollar','nehir kolları'],['sinir','Sınır akarsuları','8 akarsu'],['goller','Göller','oluşum türleriyle'],['barajlar','Barajlar','en büyük 10 ve diğerleri'],['havza','Akarsu havzaları','açık · kapalı']]],
+ ['Toprak ve deprem',[['toprak','Topraklar','kitap s.112-114'],['deprem','Deprem bölgeleri','kitap s.33']]],
+ ['Genel',[['bolge','Bölgeler','il sınırlarıyla'],['iller','Tüm iller','81 il'],['komsu','Komşularımız','8 ülke'],['levha','Levhalar','yalnızca isim']]]
+];
+const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
   const el=document.getElementById('toggles');
-  el.innerHTML=LAYERS.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('');
+  el.innerHTML=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
   el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;refresh();});
 }
-function refresh(){buildZones();buildList();draw();document.getElementById('citiesRow').hidden=!(state.on.fay||state.on.ova);}
+function refresh(){buildZones();buildList();buildLegend();draw();document.getElementById('citiesRow').hidden=!state.on.fay;}
 function bl(ul){return `<ul>${ul.map(t=>`<li>${t}</li>`).join('')}</ul>`;}
 function gen(key){const g=GENERAL[key];return g?`<details class="gen"><summary>KPSS genel bilgiler</summary>${bl(g)}</details>`:'';}
-function item(id,name,color,sub,kind){const n=NOTES[name];
-  const mark=kind==='ln'?'<i class="ln"></i>':'<i class="dot"></i>';
-  return `<li><button data-f="${id}" style="--c:${color}" aria-expanded="false">${mark}<span>${name}${sub?`<small>${sub}</small>`:''}</span>${n?'<em class="chev" aria-hidden="true"></em>':''}</button>${n?`<div class="kp" style="--c:${color}" hidden><b>KPSS notları</b>${bl(n)}</div>`:''}</li>`;}
+const GRABEN_TOWNS={"Bakırçay Ovası":"Bergama, Soma, Kırkağaç","Gediz Ovası":"Manisa, Akhisar, Turgutlu, Salihli","Küçük Menderes Ovası":"Torbalı, Tire, Ödemiş","Büyük Menderes Ovası":"Söke, Aydın, Nazilli"};
+function noteFor(it){ // kitaptaki sınıflandırmadan türetilen yedek not
+  if(NOTES[it.name])return NOTES[it.name];
+  if(it.layer==='ova'&&it.group===PLAIN_TYPES.tektonik[0]){const n=["Kitapta tektonik ovalar arasında gösterilir (s.67): faylanma ve kırılmalarla oluşan çöküntü alanlarının akarsu ve göllerin alüvyonlarıyla dolmasıyla oluşmuştur.","Tektonik ovalar verimli tarım alanlarıdır ama deprem riski yüksektir."];
+    if(GRABEN_TOWNS[it.name])n.unshift(`Ege graben ovalarındandır; başlıca yerleşmeler: ${GRABEN_TOWNS[it.name]}.`);return n;}
+  if(it.layer==='barajlar'){const m=DAM_META[it.name]||[];return [`${m[0]} üzerindedir; kitaptaki baraj haritasında (s.102) gösterilir.`,"Baraj gölleri enerji (HES), sulama, içme suyu ve taşkın kontrolü amacıyla kullanılır."];}
+  return null;
+}
+function row(it,i){const n=noteFor(it);const mark=it.kind==='line'?'<i class="ln"></i>':it.kind==='area'?'<i class="ar"></i>':'<i class="dot"></i>';
+  return `<li><button data-f="${it.layer}:${i}" style="--c:${it.color}" aria-expanded="false">${mark}<span>${esc(it.name)}${it.sub?`<small>${esc(it.sub)}</small>`:''}</span>${n?'<em class="chev" aria-hidden="true"></em>':''}</button>${n?`<div class="kp" style="--c:${it.color}" hidden><b>KPSS notları</b>${bl(n)}</div>`:''}</li>`;}
 function buildList(){
   const box=document.getElementById('items');let h='';
-  const sec=(title,g,rows)=>rows.length?`<section><h3>${title}</h3>${gen(g)}<ul class="lst">${rows.join('')}</ul></section>`:'';
-  if(state.on.bolge) h+=sec('Bölgeler','bolge',REGION_GEO.map((g,i)=>item('b'+i,g.full,g.color,g.cities.length+' il')));
-  ['kirik','kivrim','volkanik'].forEach(t=>{if(!state.on[t])return;
-    if(t==='kirik'){
-      const horst=MOUNTAINS.map((m,i)=>[m,i]).filter(([m])=>m[1]===t&&m[4]!=='graben').map(([m,i])=>item('m'+i,m[0],C[t],'Horst'));
-      const graben=MOUNTAINS.map((m,i)=>[m,i]).filter(([m])=>m[1]===t&&m[4]==='graben').map(([m,i])=>item('m'+i,m[0],C[t],'Graben','ln'));
-      h+=sec('Kırık dağlar · Horstlar',t,horst)+sec('Kırık dağlar · Grabenler',t,graben);
-    } else {
-      const rows=MOUNTAINS.map((m,i)=>[m,i]).filter(([m])=>m[1]===t).map(([m,i])=>item('m'+i,m[0],C[t],''));h+=sec(TYPE_NAME[t],t,rows);
-    }});
-  if(state.on.fay) h+=sec('Fay hatları','fay',FAULTS.map((f,i)=>item('f'+i,f.name,C.fay,f.cities.join(', '),'ln')));
-  if(state.on.ova){
-    h+=sec('Ovalar','ova',OVA.map((o,i)=>item('o'+i,o[0],C.ova,'')));
-    h+=sec('Platolar','plato',PLATO.map((o,i)=>item('p'+i,o[0],C.plato,'')));}
-  if(state.on.masif) h+=sec('Masifler','masif',MASIF.map((o,i)=>item('s'+i,o[0],C.masif,o[1])));
-  if(state.on.goller) h+=sec('Göller','goller',LAKES.map((l,i)=>item('g'+i,l.name,C.goller,l.region||'')));
-  if(state.on.nehirler) h+=sec('Nehirler','nehirler',RIVERS.map((r,i)=>item('r'+i,r.name,C.nehirler,r.basin,'ln')));
-  if(state.on.akarsular) h+=sec('Akarsular · kollar','akarsular',STREAMS.map((r,i)=>item('a'+i,r.name,C.akarsular,r.basin,'ln')));
-  if(state.on.komsu) h+=sec('Komşularımız','komsu',NEIGHBORS.map((n,i)=>item('n'+i,n.name,n.color,'kara sınırı')));
-  if(state.on.levha) h+=sec('Levhalar','levha',PLATES.map((o,i)=>item('l'+i,o[0],C.levha,'')));
+  LAYERS.flatMap(g=>g[1]).forEach(([l,title])=>{if(!state.on[l]||l==='iller')return;
+    const list=ITEMS[l];let rows='',grp=null;
+    list.forEach((it,i)=>{if(it.group!==grp){if(it.group)rows+=`<li class="grp">${esc(it.group)}</li>`;grp=it.group;}rows+=row(it,i);});
+    h+=`<section><h3>${title}</h3>${gen(l)}<ul class="lst">${rows}</ul></section>`;});
   if(state.on.iller){h+=`<section><h3>İller (81)</h3>${gen('iller')}`;
     Object.keys(BOLGE_ILLER).forEach(r=>{h+=`<p class="reg">${r} Bölgesi <span>${BOLGE_ILLER[r].length} il</span></p><div class="chips">${BOLGE_ILLER[r].map(n=>`<button class="chip" data-c="${n}">${n}</button>`).join('')}</div>`;});h+='</section>';}
-  box.innerHTML=(h?`<p class="disc">Notlar KPSS coğrafya konu kalıplarına göre derlenmiştir. Belirli sınav yıllarını ve soru numaralarını doğrulayamadığım için sorulmuş soruyu değil, sık sorulan bilgileri veriyorum. Ders kitabınızla karşılaştırmanızı öneririm.</p>`:'')+ (h||'<p class="empty">Haritada göstermek için soldan bir katman seçin.</p>');
-  box.querySelectorAll('.lst button').forEach(b=>b.onclick=()=>{const k=b.dataset.f[0],i=+b.dataset.f.slice(1);
+  box.innerHTML=(h?`<p class="disc">Notlar ve alan sınırları <b>docs/source.pdf</b> (KPSS Coğrafya ders kitabı) esas alınarak hazırlanmıştır. Ova, plato, masif, toprak, havza ve deprem alanları kitap haritalarından sayısallaştırılmıştır (yaklaşık). Akarsu, göl ve baraj konumları OpenStreetMap verisidir.</p>`:'')+(h||'<p class="empty">Haritada göstermek için soldan bir katman seçin.</p>');
+  box.querySelectorAll('.lst button').forEach(b=>b.onclick=()=>{const [l,i]=b.dataset.f.split(':');const it=ITEMS[l][+i];
     const kp=b.nextElementSibling;const open=kp&&!kp.hidden;
     box.querySelectorAll('.kp').forEach(e=>e.hidden=true);box.querySelectorAll('.lst button').forEach(e=>e.setAttribute('aria-expanded','false'));
     if(kp&&!open){kp.hidden=false;b.setAttribute('aria-expanded','true');}
-    if(k==='m')focusOn([[MOUNTAINS[i][2],MOUNTAINS[i][3]]],4);
-    else if(k==='f')focusOn(FAULTS[i].pts,2);
-    else if(k==='o')focusOn([[OVA[i][2],OVA[i][3]]],4);
-    else if(k==='p')focusOn([[PLATO[i][2],PLATO[i][3]]],4);
-    else if(k==='s')focusOn([[MASIF[i][2],MASIF[i][3]]],3.5);
-    else if(k==='b')focusOn(REGION_GEO[i].cities.map(n=>CITY[n]),1.05);
-    else if(k==='g')focusOn([[LAKES[i].lon,LAKES[i].lat]],5.5);
-    else if(k==='r')focusOn(RIVERS[i].pts,2.5);
-    else if(k==='a')focusOn(STREAMS[i].pts,2.5);
-    else if(k==='n')focusOn([[NEIGHBORS[i].labelLon,NEIGHBORS[i].labelLat]],2.5);
-    else focusOn([[PLATES[i][1],PLATES[i][2]]],2);});
-  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const c=CITY[b.dataset.c];focusOn([[c[0],c[1]]],5);});
+    focusBox(it.box,it.kind==='point'?4:(l==='bolge'?2:8));});
+  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const it=ITEMS.iller.find(x=>x.name===b.dataset.c);if(it)focusBox(it.box,6);});
+}
+function buildLegend(){
+  const el=document.getElementById('legend');const ls=['toprak','deprem','havza'].filter(l=>state.on[l]);
+  if(!ls.length||QUIZ.active){el.hidden=true;return;}
+  el.hidden=false;
+  el.innerHTML=ls.map(l=>`<b>${LAYER_NAME[l]}</b>`+ITEMS[l].map(it=>`<span><i style="background:${it.key==='kirecli'?'repeating-linear-gradient(45deg,#8FD4F5 0 3px,#2F6F95 3px 4.5px)':it.color}"></i>${esc(it.name)}</span>`).join('')).join('');
 }
 document.getElementById('showCities').onchange=e=>{state.cities=e.target.checked;draw();};
-document.getElementById('all').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=true);buildToggles();refresh();};
+document.getElementById('all').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=!['toprak','deprem','havza','bolge','iller'].includes(k));buildToggles();refresh();};
 document.getElementById('none').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=false);buildToggles();refresh();};
 
 /* ---------- quiz ---------- */
-const QUIZ={active:false,pool:[],idx:0,total:8,correct:0,answered:false,guess:null,target:null};
-const TOL={kirik:45,kivrim:45,volkanik:45,ova:55,plato:70,masif:80,levha:320,iller:45,bolge:200,goller:35,komsu:100,nehirler:60,akarsular:50};
-function poolFromCat(cat){
-  if(cat==='kirik'||cat==='kivrim'||cat==='volkanik') return MOUNTAINS.filter(m=>m[1]===cat).map(m=>({name:m[0],lon:m[2],lat:m[3],cat,tol:TOL[cat]}));
-  if(cat==='ova') return OVA.map(o=>({name:o[0],lon:o[2],lat:o[3],cat,tol:TOL.ova}));
-  if(cat==='plato') return PLATO.map(o=>({name:o[0],lon:o[2],lat:o[3],cat,tol:TOL.plato}));
-  if(cat==='masif') return MASIF.map(o=>({name:o[0],lon:o[2],lat:o[3],cat,tol:TOL.masif}));
-  if(cat==='levha') return PLATES.map(p=>({name:p[0],lon:p[1],lat:p[2],cat,tol:TOL.levha}));
-  if(cat==='iller') return ILLER.map(n=>({name:n,lon:CITY[n][0],lat:CITY[n][1],cat,tol:TOL.iller}));
-  if(cat==='bolge') return REGION_GEO.map(g=>({name:g.full,lon:g.lon,lat:g.lat,cat,tol:TOL.bolge}));
-  if(cat==='goller') return LAKES.map(l=>({name:l.name,lon:l.lon,lat:l.lat,cat,tol:TOL.goller}));
-  if(cat==='nehirler'||cat==='akarsular') return (cat==='nehirler'?RIVERS:STREAMS).map(r=>({name:r.name,lon:r.pts[Math.floor(r.pts.length/2)][0],lat:r.pts[Math.floor(r.pts.length/2)][1],cat,tol:TOL[cat]}));
-  if(cat==='komsu') return NEIGHBORS.map(n=>({name:n.name,lon:n.labelLon,lat:n.labelLat,cat,tol:TOL.komsu}));
-  return [];
+// Doğrulama: tıklanan nokta hedefin alanı içinde ya da çizgisine/sınırına tolerans kadar yakınsa doğru.
+const QUIZ={active:false,pool:[],idx:0,total:8,correct:0,answered:false,guess:null,target:null,ok:false,near:null,dist:0,asked:8};
+const TOL_PX=14, MIN_TOL_KM=8, MAX_TOL_KM=30;
+const DEFAULT_CATS=['kivrim','volkanik','kirik','ova','plato','masif','nehirler','goller','bolge'];
+function kmPerWorld(lat){return {x:111.32*Math.cos(lat*Math.PI/180)/KX,y:110.57/KY};}
+function segs(it){ // path -> [[x,y],...] çoklu çizgiler (önbellekli)
+  if(it._segs)return it._segs;
+  const out=[];(it.d.match(/M[^M]+/g)||[]).forEach(part=>{const n=part.match(/-?\d+(\.\d+)?/g).map(Number);const pts=[];for(let i=0;i+1<n.length;i+=2)pts.push([n[i],n[i+1]]);
+    if(/Z/.test(part)&&pts.length)pts.push(pts[0]);out.push(pts);});
+  return it._segs=out;
+}
+function nearestOn(it,wx,wy){ // en yakın nokta ve km mesafesi
+  const k=kmPerWorld(invP(wx,wy)[1]);let best=1e9,bp=null;
+  segs(it).forEach(pts=>{for(let i=0;i+1<pts.length;i++){const [ax,ay]=pts[i],[bx,by]=pts[i+1];
+    const dx=(bx-ax)*k.x,dy=(by-ay)*k.y,px=(wx-ax)*k.x,py=(wy-ay)*k.y;const L=dx*dx+dy*dy;let t=L?(px*dx+py*dy)/L:0;t=Math.max(0,Math.min(1,t));
+    const ex=px-t*dx,ey=py-t*dy,d=Math.hypot(ex,ey);if(d<best){best=d;bp=[ax+t*(bx-ax),ay+t*(by-ay)];}}});
+  return [best,bp];
+}
+function judge(it,wx,wy){
+  const k=kmPerWorld(invP(wx,wy)[1]);
+  const tolKm=Math.min(MAX_TOL_KM,Math.max(TOL_PX/S()*k.y,MIN_TOL_KM));
+  if(it.kind==='point'){const [lon,lat]=invP(wx,wy),[tl,tt]=invP(it.wx,it.wy);const d=distKm(lon,lat,tl,tt);return {ok:d<=Math.max(it.tol||35,tolKm),dist:d,near:[it.wx,it.wy],inside:false};}
+  let inside=false;
+  if(it.kind==='area'){const hit=document.getElementById('hit');hit.setAttribute('d',it.d);
+    try{inside=hit.isPointInFill(new DOMPoint(wx,wy));}catch(e){const p=svg.createSVGPoint();p.x=wx;p.y=wy;inside=hit.isPointInFill(p);}}
+  const [d,near]=nearestOn(it,wx,wy);
+  return {ok:inside||d<=tolKm+(it.tol||0),dist:inside?0:d,near,inside};
+}
+function highlight(it){
+  const g=document.getElementById('qhl');
+  if(!it||it.kind==='point'){g.innerHTML='';return;}
+  g.innerHTML=it.kind==='area'?`<path d="${it.d}" fill="#1E8F4E" fill-opacity=".28" fill-rule="evenodd" stroke="#0E6B38" stroke-width="2.6" vector-effect="non-scaling-stroke"/>`
+    :lineSvg(it.d,'#12A150',5,true);
 }
 function buildQuizPool(){
-  let cats=Object.keys(state.on).filter(k=>state.on[k]&&k!=='fay');
-  if(state.on.ova) cats.push('plato');
-  if(!cats.length) cats=['kirik','kivrim','volkanik','ova','plato','masif','goller','iller','bolge','levha'];
-  let pool=[]; cats.forEach(c=>pool=pool.concat(poolFromCat(c)));
+  let cats=Object.keys(state.on).filter(k=>state.on[k]);
+  if(!cats.length)cats=DEFAULT_CATS;
+  const seen=new Set();let pool=[];
+  cats.forEach(c=>(ITEMS[c]||[]).forEach(it=>{if(seen.has(it.name))return;seen.add(it.name);pool.push(it);}));
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   return pool;
 }
 const qEl=document.getElementById('quizcard');
 function startQuiz(n){
   const pool=buildQuizPool();
-  QUIZ.active=true;QUIZ.pool=pool.slice(0,Math.min(n,pool.length));QUIZ.total=QUIZ.pool.length;QUIZ.idx=0;QUIZ.correct=0;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;
-  document.getElementById('quizStart').hidden=true;
-  qEl.hidden=false;
+  Object.assign(QUIZ,{active:true,asked:n,pool:pool.slice(0,Math.min(n,pool.length)),idx:0,correct:0,answered:false,guess:null,target:null});
+  QUIZ.total=QUIZ.pool.length;QUIZ.short=pool.length<n;
+  document.getElementById('quizStart').hidden=true;document.getElementById('quizCustom').hidden=true;
+  document.getElementById('items').hidden=true;qEl.hidden=false;buildLegend();
   nextQ(false);
-  draw();
 }
 function nextQ(advance){
   if(advance)QUIZ.idx++;
-  QUIZ.answered=false;QUIZ.guess=null;
+  QUIZ.answered=false;QUIZ.guess=null;QUIZ.near=null;highlight(null);
   if(QUIZ.idx>=QUIZ.total){renderQuizDone();return;}
   QUIZ.target=QUIZ.pool[QUIZ.idx];
-  renderQuizCard();
-  draw();
+  renderQuizCard();draw();
 }
 function submitGuess(cx,cy){
   if(!QUIZ.active||QUIZ.answered)return;
-  const [lon,lat]=screenToLonLat(cx,cy);
-  QUIZ.guess=[lon,lat];QUIZ.answered=true;
-  const d=distKm(lon,lat,QUIZ.target.lon,QUIZ.target.lat);
-  const ok=d<=QUIZ.target.tol;
-  if(ok)QUIZ.correct++;
-  renderQuizCard(d,ok);
-  draw();
+  const [wx,wy]=screenToWorld(cx,cy);
+  const r=judge(QUIZ.target,wx,wy);
+  Object.assign(QUIZ,{guess:[wx,wy],answered:true,ok:r.ok,near:r.near,dist:r.dist,inside:r.inside});
+  if(r.ok)QUIZ.correct++;
+  highlight(QUIZ.target);renderQuizCard();draw();
 }
-function renderQuizCard(d,ok){
-  const t=QUIZ.target;
+function renderQuizCard(){
+  const t=QUIZ.target;const what=t.kind==='area'?'alanına':t.kind==='line'?'çizgisine':'yerine';
   let html=`<div class="qtop"><span>Soru ${QUIZ.idx+1}/${QUIZ.total}</span><span>Puan: ${QUIZ.correct}</span><button id="qClose" aria-label="Kapat">✕</button></div>`;
-  html+=`<div class="qq">“<b>${esc(t.name)}</b>” nerede? Haritada işaretle.</div>`;
+  html+=`<div class="qq">“<b>${esc(t.name)}</b>” nerede?</div><div class="qcat">${esc(LAYER_NAME[t.layer]||'')}${t.group?' · '+esc(t.group):''}</div>`;
   if(QUIZ.answered){
-    const dist=d.toFixed(0);
-    html+=`<div class="qres ${ok?'ok':'no'}">${ok?'✔ Doğru civar!':'✘ Biraz uzak'} — tahminin gerçek yere <b>${dist} km</b> uzaklıktaydı.</div>`;
+    const km=Math.round(QUIZ.dist);
+    const msg=QUIZ.ok?(QUIZ.inside?'✔ Doğru! Tam alanın içinde.':(t.kind==='point'?`✔ Doğru! Hedefe ${km} km.`:`✔ Doğru! ${t.kind==='line'?'Çizgiye':'Sınıra'} ${km} km yakınlıkta.`))
+      :`✘ Olmadı — doğru ${t.kind==='point'?'yere':(t.kind==='line'?'çizgiye':'alana')} en kısa mesafe <b>${km} km</b>. Yeşil ile gösterildi.`;
+    html+=`<div class="qres ${QUIZ.ok?'ok':'no'}">${msg}</div>`;
     html+=`<div class="qbar"><button id="qNext">${QUIZ.idx+1>=QUIZ.total?'Sonuçları gör':'Sonraki soru →'}</button></div>`;
   } else {
-    html+=`<div class="qhint">Haritaya dokun / tıkla.</div>`;
+    html+=`<div class="qhint">Haritada ${what} dokun. Kenarına yakın dokunuşlar da doğru sayılır.${QUIZ.idx===0&&QUIZ.short?` <b>Aktif katmanlarda ${QUIZ.total} öğe var</b>, ${QUIZ.asked} yerine ${QUIZ.total} soru sorulacak.`:''}</div>`;
   }
   qEl.innerHTML=html;
   document.getElementById('qClose').onclick=endQuiz;
   if(QUIZ.answered)document.getElementById('qNext').onclick=()=>nextQ(true);
 }
 function renderQuizDone(){
-  const pct=Math.round(100*QUIZ.correct/QUIZ.total);
+  const pct=QUIZ.total?Math.round(100*QUIZ.correct/QUIZ.total):0;
   qEl.innerHTML=`<div class="qtop"><span>Sonuç</span><button id="qClose" aria-label="Kapat">✕</button></div>
     <div class="qdone"><div class="qscore">${QUIZ.correct}/${QUIZ.total}</div><div>doğru (%${pct})</div></div>
     <div class="qbar"><button id="qAgain">Tekrar oyna</button><button id="qStop" class="ghost">Bitir</button></div>`;
   document.getElementById('qClose').onclick=endQuiz;
-  document.getElementById('qAgain').onclick=()=>startQuiz(QUIZ.pool.length||8);
+  document.getElementById('qAgain').onclick=()=>startQuiz(QUIZ.asked);
   document.getElementById('qStop').onclick=endQuiz;
-  QUIZ.answered=false;QUIZ.guess=null;draw();
+  QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;highlight(null);draw();
 }
-function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;qEl.hidden=true;document.getElementById('quizStart').hidden=false;draw();}
+function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;highlight(null);qEl.hidden=true;
+  document.getElementById('quizStart').hidden=false;document.getElementById('items').hidden=false;buildLegend();draw();}
 document.querySelectorAll('.qn').forEach(b=>b.onclick=()=>startQuiz(+b.dataset.n));
+const qCount=document.getElementById('quizCount'),qCountVal=document.getElementById('quizCountVal');
+document.getElementById('moreQuiz').onclick=()=>{const c=document.getElementById('quizCustom');c.hidden=!c.hidden;if(!c.hidden)qCount.focus();};
+qCount.oninput=()=>{qCountVal.textContent=qCount.value+' soru';};
+document.getElementById('quizStartCustom').onclick=()=>startQuiz(+qCount.value);
 
-buildWorld();buildToggles();buildZones();buildList();
+buildWorld();buildToggles();refresh();
 new ResizeObserver(resize).observe(svg);resize();
-document.getElementById('citiesRow').hidden=true;
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{for(const k in wcache)delete wcache[k];draw();});

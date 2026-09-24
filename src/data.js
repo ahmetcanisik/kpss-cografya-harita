@@ -14,23 +14,28 @@ const CITY = {
 "Şereflikoçhisar":[33.54,38.94],"Pozantı":[34.87,37.43],"Çamardı":[34.98,37.83],"Yahyalı":[35.35,38.1]
 };
 
-// [ad, tür, boylam, enlem]
-const MOUNTAINS = [
-["Kaz Dağları","kirik",26.85,39.7,"horst"],["Madra Dağı","kirik",27.3,39.2,"horst"],["Yunt Dağı","kirik",27.55,38.75,"horst"],
-["Bozdağlar","kirik",28.05,38.3,"horst"],["Aydın Dağları","kirik",27.95,37.65,"horst"],["Menteşe Dağları","kirik",28.35,37.1,"horst"],
-["Nur (Amanos) Dağları","kirik",36.4,37.0,"horst"],
-["Bakırçay Grabeni","kirik",27.2,39.1,"graben"],["Gediz Grabeni","kirik",28.15,38.48,"graben"],
-["Küçük Menderes Grabeni","kirik",27.75,38.1,"graben"],["Büyük Menderes Grabeni","kirik",28.33,37.9,"graben"],
-["Beydağları","kivrim",30.2,36.7],["Geyik Dağları","kivrim",32.3,36.85],["Bolkar Dağları","kivrim",34.55,37.35],
-["Aladağlar","kivrim",35.2,37.85],["Munzur Dağları","kivrim",39.6,39.3],["Mercan Dağları","kivrim",40.1,39.75],
-["Cudi Dağı","kivrim",42.2,37.35],["Hakkâri Dağları","kivrim",43.85,37.55],
-["Köroğlu Dağları","kivrim",32.6,40.7],["Ilgaz Dağları","kivrim",33.75,41.05],["Küre Dağları","kivrim",33.7,41.65],
-["Samanlı Dağları","kivrim",29.5,40.5],["Canik Dağları","kivrim",37.1,40.55],["Kaçkar Dağları","kivrim",41.15,40.85],["Yalnızçam Dağları","kivrim",42.55,41.1],
-["Allahuekber Dağları","kivrim",42.4,40.4],["Palandöken Dağları","kivrim",41.3,39.75],
-["Ağrı Dağı","volkanik",44.3,39.7],["Tendürek Dağı","volkanik",43.85,39.35],["Süphan Dağı","volkanik",42.83,38.93],
-["Nemrut Dağı","volkanik",42.23,38.65],["Bingöl Dağı","volkanik",40.55,39.35],["Karacadağ","volkanik",39.85,37.72],
-["Erciyes Dağı","volkanik",35.45,38.53],["Hasan Dağı","volkanik",34.17,38.13],["Melendiz Dağı","volkanik",34.6,38.25],
-["Karadağ (Karaman)","volkanik",33.1,37.4],["Kula Volkanları","volkanik",28.65,38.55]
+// Volkanik dağlar (kitap s.57): [ad, boylam, enlem]
+const VOLCANOES = [
+["Ağrı Dağı",44.3,39.7],["Tendürek Dağı",43.85,39.35],["Süphan Dağı",42.83,38.93],["Nemrut Dağı",42.23,38.65],
+["Bingöl Dağı",40.55,39.35],["Karacadağ (Şanlıurfa)",39.83,37.67],["Erciyes Dağı",35.45,38.53],["Hasan Dağı",34.17,38.13],
+["Melendiz Dağı",34.6,38.25],["Karacadağ (Konya)",33.6,37.8],["Karadağ (Karaman)",33.1,37.4],["Kula Volkanları",28.65,38.55]
+];
+// Kırık dağlar (horstlar) çizgi olarak, kitap s.57 şemasına göre: {ad, çizgiler}
+const HORSTS = [
+{name:"Kaz Dağları",lines:[[[26.75,39.68],[27.25,39.78]]]},
+{name:"Madra Dağı",lines:[[[27.05,39.28],[27.55,39.42]]]},
+{name:"Yunt Dağı",lines:[[[27.2,38.8],[27.62,38.96]]]},
+{name:"Bozdağlar",lines:[[[27.7,38.3],[28.1,38.34],[28.45,38.33]]]},
+{name:"Aydın Dağları",lines:[[[27.6,37.95],[28.05,38.0],[28.5,38.05]]]},
+{name:"Menteşe Dağları",lines:[[[27.7,37.55],[28.0,37.3]],[[28.2,37.6],[28.4,37.3]],[[28.5,37.65],[28.9,37.45]],[[28.85,37.75],[29.3,37.65]]]},
+{name:"Nur (Amanos) Dağları",lines:[[[36.12,36.45],[36.35,36.9],[36.55,37.25]]]}
+];
+// Ege grabenleri (ters üçgen): [ad, boylam, enlem]
+const GRABENS = [["Bakırçay Grabeni",27.2,39.1],["Gediz Grabeni",28.15,38.48],["Küçük Menderes Grabeni",27.75,38.1],["Büyük Menderes Grabeni",28.33,37.9]];
+// Kitap kıvrım dağı haritasında (s.55) çizilmemiş ama KPSS'de geçen kıvrım dağları
+const FOLDS_EXTRA = [
+{name:"Munzur Dağları",lines:[[[38.9,39.35],[39.6,39.25],[40.2,39.15]]],extra:true},
+{name:"Cudi Dağı",lines:[[[42.0,37.33],[42.5,37.45]]],extra:true}
 ];
 
 // Fay hatları: çizgi üzerinde isim yazılmaz; şehirler gösterilir
@@ -45,96 +50,55 @@ const FAULTS = [
 {name:"Ecemiş Fayı",pts:[[34.87,37.43],[35.0,37.85],[35.35,38.1],[35.6,38.5]],cities:["Pozantı","Çamardı","Yahyalı"]}
 ];
 
-// [ad, bölge, boylam, enlem, rx, ry (enlem derecesi), açı, şehirler]
-const OVA = [
-["Çukurova","Akdeniz Bölgesi",35.3,37.0,0.6,0.35,0,["Adana","Mersin"]],
-["Amik Ovası","Akdeniz Bölgesi",36.35,36.4,0.3,0.2,0,["Hatay"]],
-["Antalya Ovası","Akdeniz Bölgesi",30.7,36.95,0.35,0.25,0,["Antalya"]],
-["Bafra Ovası","Karadeniz Bölgesi",35.95,41.6,0.3,0.2,0,["Samsun"]],
-["Çarşamba Ovası","Karadeniz Bölgesi",36.7,41.2,0.25,0.2,0,["Samsun"]],
-["Harran Ovası","Güneydoğu Anadolu Bölgesi",39.0,36.85,0.55,0.3,0,["Şanlıurfa"]],
-["Bursa Ovası","Marmara Bölgesi",29.1,40.2,0.3,0.2,0,["Bursa"]],
-["Ergene (Trakya) Ovası","Marmara Bölgesi",27.4,41.3,0.8,0.45,0,["Edirne","Kırklareli","Tekirdağ"]],
-["Adapazarı Ovası","Marmara Bölgesi",30.5,40.75,0.45,0.2,0,["Sakarya"]],
-["Erzurum Ovası","Doğu Anadolu Bölgesi",41.3,39.95,0.3,0.2,0,["Erzurum"]],
-["Muş Ovası","Doğu Anadolu Bölgesi",41.5,38.85,0.4,0.2,0,["Muş"]],
-["Iğdır Ovası","Doğu Anadolu Bölgesi",44.1,39.95,0.3,0.2,0,["Iğdır"]],
-["Malatya Ovası","Doğu Anadolu Bölgesi",38.3,38.4,0.3,0.2,0,["Malatya"]],
-["Erzincan Ovası","Doğu Anadolu Bölgesi",39.5,39.75,0.35,0.15,0,["Erzincan"]],
-["Bakırçay Ovası","Ege Bölgesi",27.2,39.1,0.3,0.2,0,["İzmir"]],
-["Gediz Ovası","Ege Bölgesi",27.8,38.55,0.4,0.15,0,["Manisa"]],
-["Küçük Menderes Ovası","Ege Bölgesi",27.75,38.1,0.3,0.12,0,["İzmir"]],
-["Büyük Menderes Ovası","Ege Bölgesi",27.9,37.85,0.5,0.15,0,["Aydın"]],
-["Konya Ovası","İç Anadolu Bölgesi",32.6,37.7,1.1,0.6,0,["Konya","Karaman"]]
-];
-const PLATO = [
-["Haymana Platosu","İç Anadolu Bölgesi",32.4,39.4,0.5,0.35,0,["Ankara"]],
-["Cihanbeyli Platosu","İç Anadolu Bölgesi",32.9,38.75,0.5,0.3,0,["Konya"]],
-["Obruk Platosu","İç Anadolu Bölgesi",33.4,38.15,0.4,0.3,0,["Konya","Aksaray"]],
-["Uzunyayla Platosu","İç Anadolu Bölgesi",36.4,38.75,0.6,0.3,0,["Kayseri","Sivas"]],
-["Bozok Platosu","İç Anadolu Bölgesi",35.0,39.7,0.6,0.4,0,["Yozgat","Çorum"]],
-["Eskişehir Platosu","İç Anadolu Bölgesi",30.8,39.55,0.6,0.3,0,["Eskişehir"]],
-["Teke Platosu","Akdeniz Bölgesi",30.1,37.2,0.5,0.35,0,["Antalya","Burdur"]],
-["Kars Platosu","Doğu Anadolu Bölgesi",43.0,40.6,0.6,0.35,0,["Kars","Ardahan"]],
-["Gaziantep Platosu","Güneydoğu Anadolu Bölgesi",37.5,37.0,0.4,0.25,0,["Gaziantep"]],
-["Mardin Eşiği (Platosu)","Güneydoğu Anadolu Bölgesi",40.8,37.35,0.5,0.25,0,["Mardin"]],
-["Ceylanpınar Platosu","Güneydoğu Anadolu Bölgesi",40.1,36.9,0.5,0.2,0,["Şanlıurfa"]]
-];
-const MASIF = [
-["Menderes Masifi","Ege Bölgesi",28.6,38.05,1.0,0.48,-8],
-["Kazdağ Masifi","Marmara Bölgesi",27.1,39.7,0.38,0.24,-20],
-["Uludağ Masifi","Marmara Bölgesi",29.15,40.05,0.4,0.25,0],
-["Istranca (Yıldız) Masifi","Marmara Bölgesi",27.95,41.75,0.6,0.17,-22],
-["Zonguldak Masifi","Karadeniz Bölgesi",31.8,41.35,0.42,0.2,-10],
-["Kırşehir Masifi","İç Anadolu Bölgesi",34.0,39.2,1.3,0.7,0],
-["Sultan Dağları Masifi","İç Anadolu Bölgesi",31.2,38.3,0.55,0.18,-12],
-["Niğde Masifi","İç Anadolu Bölgesi",34.75,37.85,0.5,0.4,0],
-["Alanya-Anamur Masifi","Akdeniz Bölgesi",32.0,36.25,0.6,0.18,-8],
-["Malatya-Pötürge Masifi","Doğu Anadolu Bölgesi",38.7,38.25,0.55,0.22,-12],
-["Mardin-Derik Masifi","Güneydoğu Anadolu Bölgesi",40.2,37.25,0.48,0.18,-8],
-["Bitlis Masifi","Doğu Anadolu Bölgesi",42.2,38.2,1.0,0.4,-15]
-];
+// Ova ve plato türleri (kitap s.60-67)
+const PLAIN_TYPES = {delta:["Delta ovaları","#4FA06A"],tektonik:["Tektonik ovalar","#B06FB3"],karstik:["Karstik ovalar (polyeler)","#9C9CC4"],eskigol:["Eski göl tabanı ovaları","#8E5A9E"],lav:["Lav örtüsü ovaları","#E0655A"],dagetegi:["Dağ eteği ovaları","#6F9B45"]};
+const PLATEAU_TYPES = {asinim:["Aşınım düzlüğü platoları","#3E7FA6"],karstik:["Karstik platolar","#8F8F99"],lav:["Lav platoları","#E8706C"],tuf:["Tüf platosu","#3B3A40"],yatay:["Yatay duruşlu tabaka düzlüğü platoları","#A56BC4"]};
+
 const PLATES = [["Avrasya Levhası",31.5,43.15],["Anadolu Levhası",32.5,38.55],["Arap Levhası",39.6,35.4],["Afrika Levhası",29.5,34.5],["Ege Levhası",26.3,36.55]];
 const SEAS = [["Karadeniz",35.0,42.55],["Ege Denizi",25.2,38.9],["Akdeniz",33.0,35.3],["Marmara Denizi",28.1,40.72]];
 
-// Başlıca akarsu güzergâhları. Güzergâhlar harita ölçeğinde yaklaşık çizilmiştir.
-const RIVERS = [
-  {name:"Kızılırmak",basin:"Karadeniz",pts:[[38.8,39.6],[37.7,39.4],[36.4,39.1],[35.2,39.2],[34.5,40.0],[34.0,40.6],[35.0,41.0],[35.8,41.6]]},
-  {name:"Yeşilırmak",basin:"Karadeniz",pts:[[36.5,39.7],[36.0,40.1],[35.6,40.5],[36.1,40.8],[36.6,41.0],[37.3,41.2]]},
-  {name:"Sakarya",basin:"Karadeniz",pts:[[31.9,39.7],[31.5,40.1],[30.9,40.4],[30.5,40.8],[30.3,41.1],[30.0,41.3]]},
-  {name:"Fırat",basin:"Basra Körfezi",pts:[[39.7,39.8],[39.5,39.0],[38.9,38.5],[38.3,38.1],[37.5,37.8],[37.0,37.3],[37.7,36.8],[38.2,36.6]]},
-  {name:"Dicle",basin:"Basra Körfezi",pts:[[40.8,38.0],[40.2,37.8],[40.0,37.3],[40.5,36.9],[41.1,36.6],[41.7,36.4]]},
-  {name:"Aras",basin:"Hazar Denizi",pts:[[40.2,39.8],[41.0,40.0],[42.0,39.9],[43.0,39.7],[44.0,39.6],[44.7,39.5]]},
-  {name:"Çoruh",basin:"Karadeniz",pts:[[41.0,40.9],[41.4,40.7],[41.6,40.3],[41.7,40.0],[41.6,39.8]]},
-  {name:"Meriç",basin:"Ege Denizi",pts:[[26.2,42.0],[26.4,41.7],[26.0,41.4],[26.1,41.1],[26.5,40.9]]},
-  {name:"Seyhan",basin:"Akdeniz",pts:[[36.0,38.2],[35.5,37.8],[35.3,37.3],[35.2,36.9]]},
-  {name:"Ceyhan",basin:"Akdeniz",pts:[[36.5,38.2],[36.7,37.7],[36.7,37.2],[36.6,36.8]]},
-  {name:"Asi",basin:"Akdeniz",pts:[[36.9,36.8],[36.3,36.5],[36.1,36.2],[36.1,35.9]]}
-];
-const STREAMS = [
-  {name:"Büyük Menderes",basin:"Ege",pts:[[30.2,38.0],[29.6,37.9],[29.1,37.8],[28.5,37.8],[27.9,37.8],[27.4,37.8]]},
-  {name:"Küçük Menderes",basin:"Ege",pts:[[28.8,38.3],[28.4,38.2],[28.0,38.1],[27.6,38.0],[27.4,37.9]]},
-  {name:"Gediz",basin:"Ege",pts:[[29.0,39.0],[28.5,38.8],[28.1,38.6],[27.7,38.6],[27.3,38.6]]},
-  {name:"Göksu",basin:"Akdeniz",pts:[[35.7,38.0],[35.0,37.4],[34.6,36.9],[34.2,36.4]]},
-  {name:"Murat",basin:"Fırat kolu",pts:[[42.7,39.3],[42.0,39.2],[41.3,39.0],[40.6,38.9],[39.8,39.1]]},
-  {name:"Kura",basin:"Hazar Denizi",pts:[[42.7,41.1],[43.2,40.8],[43.8,40.5],[44.3,40.2]]},
-  {name:"Porsuk",basin:"Sakarya kolu",pts:[[31.2,39.6],[30.8,39.7],[30.4,39.8],[30.0,40.0]]},
-  {name:"Delice",basin:"Kızılırmak kolu",pts:[[34.0,39.5],[34.5,39.7],[35.0,39.8]]}
-];
+// Akarsu bilgileri (kitap s.92-94). Geometri: geo.json → osm.rivers (OpenStreetMap)
+// ad: [tür (nehir|kol|sinir), havza, sınır oluşturduğu ülkeler]
+const RIVER_META = {
+"Kızılırmak":["nehir","Karadeniz"],"Yeşilırmak":["nehir","Karadeniz"],"Sakarya":["nehir","Karadeniz"],
+"Filyos (Yenice)":["nehir","Karadeniz"],"Çoruh":["nehir","Karadeniz"],"Fırat":["nehir","Basra Körfezi"],
+"Dicle":["nehir","Basra Körfezi","Türkiye–Suriye"],"Aras":["nehir","Hazar","Türkiye–Ermenistan–Nahçıvan"],
+"Kura":["nehir","Hazar"],"Meriç":["nehir","Ege","Türkiye–Yunanistan"],"Ergene":["kol","Ege (Meriç kolu)"],
+"Susurluk (Simav)":["nehir","Marmara"],"Bakırçay":["nehir","Ege"],"Gediz":["nehir","Ege"],
+"Küçük Menderes":["nehir","Ege"],"Büyük Menderes":["nehir","Ege"],"Dalaman Çayı":["nehir","Akdeniz"],
+"Eşen Çayı":["nehir","Akdeniz"],"Aksu Çayı":["nehir","Akdeniz"],"Köprüçay":["nehir","Akdeniz"],
+"Manavgat Çayı":["nehir","Akdeniz"],"Göksu (Silifke)":["nehir","Akdeniz"],"Seyhan":["nehir","Akdeniz"],
+"Ceyhan":["nehir","Akdeniz"],"Asi":["nehir","Akdeniz","Türkiye–Suriye"],
+"Porsuk Çayı":["kol","Sakarya kolu"],"Devrez Çayı":["kol","Kızılırmak kolu"],"Kelkit Çayı":["kol","Yeşilırmak kolu"],
+"Karasu (Fırat kolu)":["kol","Fırat kolu"],"Murat":["kol","Fırat kolu"],"Zap Suyu":["kol","Dicle kolu"],
+"Harşit Çayı":["kol","Karadeniz"],"Delice Irmağı":["kol","Kızılırmak kolu"],"Gönen Çayı":["kol","Marmara"],
+"Bartın Çayı":["kol","Karadeniz"],
+"Tunca":["sinir","Meriç kolu","Türkiye–Bulgaristan"],"Mutludere":["sinir","Karadeniz","Türkiye–Bulgaristan"],
+"Arpaçay":["sinir","Aras kolu","Türkiye–Ermenistan"],"Hezil Çayı":["sinir","Dicle kolu","Türkiye–Irak"]
+};
 
-// Yaklaşık göl alanları (gerçek poligon verisi bulunamayanlar için elips)
-const LAKES_APPROX = [
-["İznik Gölü","Marmara Bölgesi",29.52,40.43,0.09,0.045,-10],
-["Sapanca Gölü","Marmara Bölgesi",30.27,40.70,0.045,0.022,-15],
-["Manyas (Kuş) Gölü","Marmara Bölgesi",27.97,40.18,0.06,0.045,0],
-["Uluabat Gölü","Marmara Bölgesi",28.58,40.17,0.08,0.035,-5],
-["Salda Gölü","Akdeniz Bölgesi",29.68,37.55,0.035,0.03,0],
-["Acıgöl (Denizli)","Ege Bölgesi",29.48,37.98,0.045,0.025,-10],
-["Burdur Gölü","Akdeniz Bölgesi",30.18,37.72,0.07,0.03,-10],
-["Akşehir Gölü","İç Anadolu Bölgesi",31.42,38.38,0.14,0.045,-8],
-["Eber Gölü","İç Anadolu Bölgesi",31.15,38.58,0.065,0.035,-5],
-["Çıldır Gölü","Doğu Anadolu Bölgesi",43.15,41.13,0.065,0.05,0],
-["Hazar Gölü","Doğu Anadolu Bölgesi",39.75,38.48,0.045,0.025,-10],
-["Erçek Gölü","Doğu Anadolu Bölgesi",43.62,38.65,0.05,0.03,0],
-["Kovada Gölü","Akdeniz Bölgesi",30.87,37.83,0.02,0.02,0]
-];
+// Göl oluşum türleri (kitap s.96-101). Geometri: geo.json → osm.lakes
+const LAKE_TYPES = {tektonik:"Tektonik göl",volkanik:"Volkanik göl",karstik:"Karstik göl",karma:"Karma oluşumlu göl",heyelan:"Heyelan set gölü",aluvyal:"Alüvyal set gölü",lav:"Lav set gölü",kiyi:"Kıyı set gölü (lagün)",traverten:"Traverten set gölü"};
+const LAKE_META = {
+"Van Gölü":"karma","Tuz Gölü":"tektonik","Seyfe Gölü":"tektonik","Aktaş Gölü":"tektonik","Hazar Gölü":"tektonik",
+"Manyas (Kuş) Gölü":"tektonik","Uluabat Gölü":"tektonik","İznik Gölü":"tektonik","Burdur Gölü":"tektonik",
+"Sapanca Gölü":"tektonik","Eber Gölü":"tektonik","Akşehir Gölü":"tektonik","Acıgöl (Denizli)":"tektonik",
+"Nemrut Krater Gölü":"volkanik","Meke Gölü":"volkanik","Acıgöl (Karapınar)":"volkanik",
+"Salda Gölü":"karstik","Avlan Gölü":"karstik","Kızören Obruğu":"karstik","Hafik Gölü":"karstik","Tödürge Gölü":"karstik",
+"Eğirdir Gölü":"karma","Kovada Gölü":"karma","Beyşehir Gölü":"karma","Suğla Gölü":"karma",
+"Abant Gölü":"heyelan","Yedigöller":"heyelan","Borabay Gölü":"heyelan","Zinav Gölü":"heyelan","Sera Gölü":"heyelan","Tortum Gölü":"heyelan",
+"Uzungöl":"aluvyal","Mogan Gölü":"aluvyal","Eymir Gölü":"aluvyal","Marmara Gölü":"aluvyal","Bafa Gölü":"aluvyal","Köyceğiz Gölü":"aluvyal",
+"Çıldır Gölü":"lav","Balık Gölü":"lav","Haçlı Gölü":"lav","Nazik Gölü":"lav","Erçek Gölü":"lav",
+"Terkos (Durusu) Gölü":"kiyi","Büyükçekmece Gölü":"kiyi","Küçükçekmece Gölü":"kiyi","Ölüdeniz":"kiyi",
+"Akyatan Lagünü":"kiyi","Yumurtalık Lagünü":"kiyi","Akgöl (Göksu Deltası)":"kiyi","Otlukbeli Gölü":"traverten"
+};
+
+// Barajlar (kitap s.102): ad -> [akarsu, en büyük 10 içindeki sırası (0 = listede yok)]
+const DAM_META = {
+"Atatürk Barajı":["Fırat",1],"Karakaya Barajı":["Fırat",2],"Keban Barajı":["Fırat",3],"Ilısu Barajı":["Dicle",4],
+"Altınkaya Barajı":["Kızılırmak",5],"Birecik Barajı":["Fırat",6],"Deriner Barajı":["Çoruh",7],"Oymapınar Barajı":["Manavgat",8],
+"Berke Barajı":["Ceyhan",9],"Ermenek Barajı":["Göksu",10],"Gökçekaya Barajı":["Sakarya",0],"Sarıyar Barajı":["Sakarya",0],
+"Hirfanlı Barajı":["Kızılırmak",0],"Almus Barajı":["Yeşilırmak",0],"Yusufeli Barajı":["Çoruh",0],"Demirköprü Barajı":["Gediz",0],
+"Adıgüzel Barajı":["Büyük Menderes",0],"Kemer Barajı":["Akçay (Büyük Menderes kolu)",0],"Manavgat Barajı":["Manavgat",0],
+"Çatalan Barajı":["Seyhan",0],"Aslantaş Barajı":["Ceyhan",0]
+};
