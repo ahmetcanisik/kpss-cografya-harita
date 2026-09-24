@@ -57,8 +57,8 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 #map:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .lb{paint-order:stroke;stroke:rgba(255,255,255,.93);stroke-width:3.4px;stroke-linejoin:round;font-family:"Instrument Sans",system-ui,sans-serif;pointer-events:none}
 .zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
-.zoom button{width:42px;height:42px;font:600 20px "Instrument Sans",sans-serif;color:#16262E;background:#fff;border:0;border-bottom:1px solid #DDE4DA;cursor:pointer}
-.zoom button:last-child{border-bottom:0;font-size:13px}
+.zoom button{width:42px;height:42px;padding:0;display:grid;place-items:center;font:600 20px "Instrument Sans",sans-serif;color:#16262E;background:#fff;border:0;border-bottom:1px solid #DDE4DA;cursor:pointer}
+.zoom button:last-child{border-bottom:0;font-size:11.5px;letter-spacing:0}
 .zoom button:hover{background:#EEF3EA}
 .zoom button:focus-visible{outline:2px solid #16262E;outline-offset:-4px}
 .note{position:absolute;left:14px;bottom:14px;max-width:calc(100% - 28px);background:rgba(22,38,46,.88);color:#EAF0EC;font-size:12.5px;padding:6px 12px;border-radius:999px}
@@ -69,6 +69,9 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 #quizStart{display:flex;gap:6px;flex-wrap:wrap}
 #quizStart button,.qbar button{font:600 12.5px "Instrument Sans",sans-serif;color:var(--panel);background:var(--accent);border:0;border-radius:999px;padding:6px 12px;cursor:pointer}
 #quizStart button:hover,.qbar button:hover{filter:brightness(1.08)}
+.qcustom{display:flex;gap:8px;align-items:center;margin-top:8px}
+.qcustom input{width:100%;accent-color:var(--accent)}
+.qcustom output{min-width:56px;text-align:center;font-size:12px;color:var(--ink)}
 .qstage{position:absolute;z-index:3;top:16px;left:50%;width:min(380px,calc(100% - 32px));transform:translateX(-50%);padding:12px 14px;background:rgba(16,30,37,.94);border:1px solid rgba(232,176,74,.65);border-radius:14px;box-shadow:0 8px 24px rgba(15,28,34,.28);color:var(--ink)}
 .qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px}
 .qtop button{margin-left:auto;width:26px;height:26px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:50%;cursor:pointer}
@@ -81,6 +84,16 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 .qdone{text-align:center;margin:12px 0 4px;color:var(--ink-2)}
 .qscore{font:700 30px "Bricolage Grotesque","Instrument Sans",sans-serif;color:var(--accent)}
 
+.tgh{margin:14px 0 4px 10px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.tgh:first-child{margin-top:4px}
+.items .grp{margin:10px 0 2px 8px;font-size:12px;font-weight:600;color:var(--accent)}
+.ar{width:12px;height:10px;border-radius:3px;background:var(--c);flex:none;margin-top:5px;box-shadow:0 0 0 1.5px #E3E9D8;opacity:.9}
+.qcat{margin:-4px 0 8px;font-size:12px;color:var(--ink-2)}
+.legend{position:absolute;left:14px;bottom:48px;max-width:min(300px,calc(100% - 28px));max-height:45%;overflow:auto;background:rgba(255,255,255,.92);color:#22303B;font-size:11.5px;line-height:1.3;padding:8px 10px;border-radius:10px;box-shadow:0 2px 10px rgba(15,28,34,.18)}
+.legend b{display:block;font-size:12px;margin:4px 0 3px}
+.legend b:first-child{margin-top:0}
+.legend span{display:flex;align-items:center;gap:6px;margin:2px 0}
+.legend i{width:14px;height:10px;border-radius:2px;flex:none;border:1px solid rgba(0,0,0,.15)}
 .items section+section{margin-top:6px}
 .disc{font-size:12px;color:var(--ink-2);background:var(--panel-2);border-radius:10px;padding:9px 12px;margin:0 0 4px;line-height:1.45}
 .gen{margin:2px 0 6px;font-size:13px}
@@ -108,6 +121,10 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
   .stage{height:100vh}
 }
 @media (max-width:900px){
+  .qstage{top:auto;bottom:10px;padding:9px 11px;border-radius:12px}
+  .qq{margin:6px 0 4px;font-size:15px}
+  .qcat{margin:-2px 0 4px}
+  .legend{max-height:34%}
   html,body{height:auto;overflow:visible}
   .app{display:flex;flex-direction:column;height:auto;overflow:visible}
   .stage{order:-1;height:64svh;height:64vh;position:sticky;top:0;z-index:2}
@@ -121,16 +138,21 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 <div class="app">
   <aside class="panel">
     <h1>KPSS Coğrafya Haritası</h1>
-    <p class="lead">Dağlar, fay hatları, ova ve platolar, masifler, nehirler, akarsular, göller, bölgeler, komşular, levhalar ve 81 il. Katmanları açıp kapatın; listedeki bir öğeye tıklayınca haritada bulur ve KPSS notlarını açar.</p>
+    <p class="lead">Dağlar, fay hatları, ovalar, platolar, masifler, akarsular, göller, barajlar, havzalar, topraklar, deprem bölgeleri, bölgeler, komşular ve 81 il. Katmanları açıp kapatın; listedeki bir öğeye tıklayınca haritada bulur ve KPSS notlarını açar.</p>
     <h2>Katmanlar</h2>
     <div class="bar"><button id="all" type="button">Hepsini aç</button><button id="none" type="button">Temizle</button></div>
     <section class="quizbox">
       <h2>🧠 Bilgini test et</h2>
-      <p>Aktif katmanlardaki isimlerden rastgele soru sorulur; haritada doğru yeri işaretlemen istenir.</p>
+      <p>Aktif katmanlardaki öğelerden rastgele soru sorulur. Nehirde çizgiye, ovada/ilde alanın içine ya da sınırına yakın tıklaman yeterli.</p>
       <div id="quizStart" aria-label="Soru sayısı seçimi">
         <button class="qn" type="button" data-n="5">5 soru</button>
         <button class="qn" type="button" data-n="8">8 soru</button>
-        <button class="qn" type="button" data-n="12">12 soru</button>
+        <button id="moreQuiz" type="button">Daha fazla…</button>
+      </div>
+      <div id="quizCustom" class="qcustom" hidden>
+        <input id="quizCount" type="range" min="12" max="100" step="1" value="12" aria-label="Soru sayısı">
+        <output id="quizCountVal" for="quizCount">12 soru</output>
+        <button id="quizStartCustom" type="button">Başlat</button>
       </div>
     </section>
     <div id="toggles"></div>
@@ -143,8 +165,9 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
     </svg>
     <div id="quizcard" class="qstage" hidden></div>
     <div class="zoom"><button id="zin" type="button" aria-label="Yakınlaştır">+</button><button id="zout" type="button" aria-label="Uzaklaştır">−</button><button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button></div>
+    <div class="legend" id="legend" hidden></div>
     <div class="note" id="note" hidden></div>
-    <div class="src">Kaynak: docs/source.pdf · Sınırlar: Natural Earth · Akarsu konumları yaklaşıktır</div>
+    <div class="src">Kaynak: docs/source.pdf · Sınırlar: Natural Earth, il verisi · Akarsu/göl: © OpenStreetMap</div>
   </main>
 </div>
 <script>
