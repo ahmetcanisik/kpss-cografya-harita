@@ -15,7 +15,7 @@ const REGION_GEO = REGIONS.map(([full,key,color])=>{
 });
 
 const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',masif:'#6B4424',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96',nehirler:'#1769AA',akarsular:'#3287B8',sinir:'#E07B00',barajlar:'#0D4F7A',komsu:'#385565'};
-const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,plato:false,masif:false,nehirler:false,akarsular:false,sinir:false,goller:false,barajlar:false,havza:false,toprak:false,deprem:false,bolge:false,iller:false,komsu:false,levha:false},cities:true,k:1,tx:0,ty:0};
+const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,plato:false,masif:false,nehirler:false,akarsular:false,sinir:false,goller:false,barajlar:false,havza:false,toprak:false,deprem:false,bolge:false,iller:false,komsu:false,levha:false},cities:true,provNames:true,k:1,tx:0,ty:0};
 const svg=document.getElementById('map'), world=document.getElementById('world'), over=document.getElementById('over'), note=document.getElementById('note');
 let W=800,H=600,fit=1;
 const ctx=document.createElement('canvas').getContext('2d');
@@ -142,7 +142,9 @@ function renderOverlay(){
   pts.forEach(([it,x,y])=>out+=MARKER[it.marker](x,y,it.color));
   cityVisible.forEach(([x,y])=>out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${C.city}" stroke="${C.fay}" stroke-width="1.6"/>`);
   if(labelsOn){
-    LABEL_ORDER.forEach(l=>{if(!state.on[l])return;
+    const provLabels=()=>{if(!(state.on.iller||state.on.bolge)||!state.provNames)return;
+      ITEMS.iller.forEach(it=>{if(it.wx===undefined)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,60))return;const bw=tw(it.name,10.5,700);label(it.name,x,y,C.city,{size:10.5,cands:centered(bw,12.5)});});};
+    LABEL_ORDER.forEach(l=>{if(l==='volkanik')provLabels();if(!state.on[l])return;
       ITEMS[l].forEach(it=>{if(it.nolabel)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,100))return;
         if(l==='bolge'){const s=W<480?10.5:12.5,t=it.name.toUpperCase(),bw=tw(t,s,800)+t.length*1.2;label(t,x,y,it.color,{size:s,weight:800,cands:centered(bw,s+2)});return;}
         if(l==='levha'){const t=it.name,bw=tw(t,15,700);label(t,x,y,C.levha,{size:15,cands:centered(bw,17)});return;}
@@ -158,18 +160,35 @@ function renderOverlay(){
   }
   // çıkmış soru: haritalı soru işaretleri (Romen rakamlı)
   if(QUIZ.mode==='exam'&&QUIZ.examQ&&QUIZ.examQ.map){
-    const perMarkerAnswer=QUIZ.examQ.map.length===QUIZ.examQ.options.length;
-    QUIZ.examQ.map.forEach((m,i)=>{
-      const [wx,wy]=P(m.lon,m.lat),x=sx(wx),y=sy(wy);
+    const q=QUIZ.examQ,good=romansOf(q.options[q.answer]),picked=QUIZ.selOpt>=0?romansOf(q.options[QUIZ.selOpt]):new Set();
+    // eşleştirme sorusu (şıkta Romen rakamı yok): doğru şıkkın parçaları işaretlerin yanına yazılır
+    const parts=good.size?null:q.options[q.answer].split(/\s+[-–]\s+/);
+    // parça sayısı işaret sayısına eşit değilse tüm işaretler aynı cevabı gösterir (örn. hepsi "Rüzgar")
+    const matching=parts&&parts.length===q.map.length,names=QUIZ.answered&&parts?(matching?parts:q.map.map(()=>q.options[q.answer])):null;
+    const pos=q.map.map(m=>{const [wx,wy]=P(m.lon,m.lat);return [sx(wx),sy(wy)];});
+    pos.forEach(([x,y])=>placed.push({x1:x-13,y1:y-13,x2:x+13,y2:y+13}));
+    q.map.forEach((m,i)=>{
+      const [x,y]=pos[i];
       let fill='#E8B04A',stroke='#16262E';
-      if(QUIZ.answered&&perMarkerAnswer){
-        if(i===QUIZ.examQ.answer){fill='#1E8F4E';}
-        else if(i===QUIZ.selOpt){fill='#C62828';}
-        else{fill='#8FA0A8';}
+      if(QUIZ.answered&&parts&&!matching)fill='#1E8F4E';
+      else if(QUIZ.answered&&good.size){
+        if(good.has(m.roman))fill='#1E8F4E';
+        else if(picked.has(m.roman))fill='#C62828';
+        else fill='#8FA0A8';
       }
       out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
       out+=`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${m.roman}</text>`;
     });
+    if(names)q.map.forEach((m,i)=>label(`${m.roman}: ${names[i]}`,pos[i][0],pos[i][1],'#0E6B38',{size:13,cands:[[15,-8],[-15-tw(`${m.roman}: ${names[i]}`,13,700),-8],[-tw(`${m.roman}: ${names[i]}`,13,700)/2,-32],[-tw(`${m.roman}: ${names[i]}`,13,700)/2,16]]}));
+  }
+  // çıkmış soru: haritasız sorularda doğru şıkkın yeri
+  if(QUIZ.mode==='exam'&&QUIZ.answered&&QUIZ.reveal){
+    QUIZ.reveal.forEach(it=>{const x=sx(it.wx),y=sy(it.wy);
+      if(it.kind==='point')out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="none" stroke="#1E8F4E" stroke-width="3.2"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#1E8F4E"/>`;
+      placed.push({x1:x-11,y1:y-11,x2:x+11,y2:y+11});});
+    QUIZ.reveal.forEach(it=>{const x=sx(it.wx),y=sy(it.wy);
+      if(it.kind==='point')label(it.name,x,y,'#0E6B38',{size:13});
+      else{const bw=tw(it.name,13,700);label(it.name,x,y,'#0E6B38',{size:13,cands:centered(bw,15)});}});
   }
   // quiz işaretleri
   if(QUIZ.active&&QUIZ.answered&&QUIZ.guess){
@@ -215,6 +234,7 @@ svg.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=
     if(lastD)zoomAt(d/lastD,(a[0]+b[0])/2-r.left,(a[1]+b[1])/2-r.top);lastD=d;moveDist+=10;}});
 const up=e=>{const wasSingle=ptrs.size===1;ptrs.delete(e.pointerId);lastD=0;if(!ptrs.size)svg.classList.remove('drag');
   if(wasSingle&&QUIZ.active&&QUIZ.mode==='explore'&&!QUIZ.answered&&QUIZ.target&&moveDist<6){const r=svg.getBoundingClientRect();submitGuess(e.clientX-r.left,e.clientY-r.top);}
+  else if(wasSingle&&!QUIZ.active&&moveDist<6&&e.type==='pointerup'){const r=svg.getBoundingClientRect();mapClick(e.clientX-r.left,e.clientY-r.top);}
   moveDist=0;};
 svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
 svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*0.0016),e.clientX-r.left,e.clientY-r.top);},{passive:false});
@@ -248,13 +268,15 @@ const LAYERS=[
 ];
 const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
-  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
+  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`+
+    (id==='iller'&&(state.on.iller||state.on.bolge)?`<label class="tgsub"><input type="checkbox" data-pn ${state.provNames?'checked':''}> İl adlarını göster</label>`:'')).join('')).join('');
   [document.getElementById('toggles'),document.getElementById('togglesMap')].forEach(el=>{
     el.innerHTML=html;
-    el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+    el.querySelectorAll('input[data-l]').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+    el.querySelectorAll('input[data-pn]').forEach(i=>i.onchange=()=>{state.provNames=i.checked;buildToggles();draw();});
   });
 }
-function refresh(){buildZones();buildList();buildLegend();draw();document.getElementById('citiesRow').hidden=!state.on.fay;}
+function refresh(){if(!QUIZ.active)highlight(null);buildZones();buildList();buildLegend();draw();document.getElementById('citiesRow').hidden=!state.on.fay;}
 function bl(ul){return `<ul>${ul.map(t=>`<li>${t}</li>`).join('')}</ul>`;}
 function gen(key){const g=GENERAL[key];return g?`<details class="gen"><summary>KPSS genel bilgiler</summary>${bl(g)}</details>`:'';}
 const GRABEN_TOWNS={"Bakırçay Ovası":"Bergama, Soma, Kırkağaç","Gediz Ovası":"Manisa, Akhisar, Turgutlu, Salihli","Küçük Menderes Ovası":"Torbalı, Tire, Ödemiş","Büyük Menderes Ovası":"Söke, Aydın, Nazilli"};
@@ -275,14 +297,42 @@ function buildList(){
     h+=`<section><h3>${title}</h3>${gen(l)}<ul class="lst">${rows}</ul></section>`;});
   if(state.on.iller){h+=`<section><h3>İller (81)</h3>${gen('iller')}`;
     Object.keys(BOLGE_ILLER).forEach(r=>{h+=`<p class="reg">${r} Bölgesi <span>${BOLGE_ILLER[r].length} il</span></p><div class="chips">${BOLGE_ILLER[r].map(n=>`<button class="chip" data-c="${n}">${n}</button>`).join('')}</div>`;});h+='</section>';}
-  box.innerHTML=(h?`<p class="disc">Notlar ve alan sınırları <b>docs/source.pdf</b> (KPSS Coğrafya ders kitabı) esas alınarak hazırlanmıştır. Ova, plato, masif, toprak, havza ve deprem alanları kitap haritalarından sayısallaştırılmıştır (yaklaşık). Akarsu, göl ve baraj konumları OpenStreetMap verisidir.</p>`:'')+(h||'<p class="empty">Haritada göstermek için soldan bir katman seçin.</p>');
-  box.querySelectorAll('.lst button').forEach(b=>b.onclick=()=>{const [l,i]=b.dataset.f.split(':');const it=ITEMS[l][+i];
-    const kp=b.nextElementSibling;const open=kp&&!kp.hidden;
-    box.querySelectorAll('.kp').forEach(e=>e.hidden=true);box.querySelectorAll('.lst button').forEach(e=>e.setAttribute('aria-expanded','false'));
-    if(kp&&!open){kp.hidden=false;b.setAttribute('aria-expanded','true');}
-    focusBox(it.box,it.kind==='point'?4:(l==='bolge'?2:8));});
+  box.innerHTML=(h?`<p class="disc">Notlar ve alan sınırları <b>Coğrafyanın Kodları KPSS</b> (KPSS Coğrafya ders kitabı) esas alınarak hazırlanmıştır. Ova, plato, masif, toprak, havza ve deprem alanları kitap haritalarından sayısallaştırılmıştır (yaklaşık). Akarsu, göl ve baraj konumları OpenStreetMap verisidir.</p>`:'')+(h||'<p class="empty">Haritada göstermek için soldan bir katman seçin.</p>');
+  box.querySelectorAll('.lst button').forEach(b=>b.onclick=()=>{const [l,i]=b.dataset.f.split(':');highlight(null);openInfo(l,+i,{toggle:true,focus:true});});
   box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const it=ITEMS.iller.find(x=>x.name===b.dataset.c);if(it)focusBox(it.box,6);});
 }
+// paneldeki öğenin KPSS notlarını aç. toggle: açıksa kapat (liste tıklaması); focus: haritada o öğeye git
+function openInfo(l,i,opt={}){
+  const box=document.getElementById('items'),it=ITEMS[l][i];
+  box.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel'));
+  let b;
+  if(l==='iller')b=[...box.querySelectorAll('.chip')].find(x=>x.dataset.c===it.name);
+  else{b=box.querySelector(`.lst button[data-f="${l}:${i}"]`);
+    const kp=b&&b.nextElementSibling,open=kp&&!kp.hidden;
+    box.querySelectorAll('.kp').forEach(e=>e.hidden=true);box.querySelectorAll('.lst button').forEach(e=>e.setAttribute('aria-expanded','false'));
+    if(kp&&!(opt.toggle&&open)){kp.hidden=false;b.setAttribute('aria-expanded','true');}}
+  if(opt.focus)focusBox(it.box,it.kind==='point'?4:(l==='bolge'?2:8));
+  else if(b){b.classList.add('sel');b.scrollIntoView({block:'center',behavior:reduce?'auto':'smooth'});}
+}
+// haritada tıklanan noktadaki öğe: önce noktalar, sonra çizgiler, sonra en küçük alan
+function hitTest(cx,cy){
+  const [wx,wy]=screenToWorld(cx,cy),kmPx=kmPerWorld(invP(wx,wy)[1]).y/S();
+  const layers=[...LABEL_ORDER,'fay','iller'].filter(l=>state.on[l]&&ITEMS[l]);
+  let best=null,bd=1e9;
+  layers.forEach(l=>ITEMS[l].forEach((it,i)=>{if(it.kind!=='point')return;const d=Math.hypot(sx(it.wx)-cx,sy(it.wy)-cy);if(d<=10&&d<bd){bd=d;best=[l,i];}}));
+  if(best)return best;
+  layers.forEach(l=>ITEMS[l].forEach((it,i)=>{if(it.kind!=='line')return;const b=it.box,m=10/S();
+    if(wx<b[0]-m||wx>b[2]+m||wy<b[1]-m||wy>b[3]+m)return;const d=nearestOn(it,wx,wy)[0]/kmPx;if(d<=8&&d<bd){bd=d;best=[l,i];}}));
+  if(best)return best;
+  const hit=document.getElementById('hit');
+  layers.forEach(l=>ITEMS[l].forEach((it,i)=>{if(it.kind!=='area')return;const b=it.box;if(wx<b[0]||wx>b[2]||wy<b[1]||wy>b[3])return;
+    hit.setAttribute('d',it.d);let inside;try{inside=hit.isPointInFill(new DOMPoint(wx,wy));}catch(e){const p=svg.createSVGPoint();p.x=wx;p.y=wy;inside=hit.isPointInFill(p);}
+    const a=(b[2]-b[0])*(b[3]-b[1]);if(inside&&a<bd){bd=a;best=[l,i];}}));
+  return best;
+}
+function mapClick(cx,cy){const h=hitTest(cx,cy);
+  if(!h){highlight(null);document.querySelectorAll('#items .sel').forEach(e=>e.classList.remove('sel'));return;}
+  highlight(ITEMS[h[0]][h[1]]);openInfo(h[0],h[1]);}
 function buildLegend(){
   const el=document.getElementById('legend');const ls=['toprak','deprem','havza'].filter(l=>state.on[l]);
   if(!ls.length||QUIZ.active){el.hidden=true;return;}
@@ -299,9 +349,15 @@ document.getElementById('noneMap').onclick=clearAllLayers;
 
 /* ---------- katman açılır menüsü (sağ üst) ---------- */
 const layerBtn=document.getElementById('layerBtn'),layerMenu=document.getElementById('layerMenu');
-layerBtn.onclick=e=>{e.stopPropagation();const open=layerMenu.hidden;layerMenu.hidden=!open;layerBtn.classList.toggle('on',open);layerBtn.setAttribute('aria-expanded',open?'true':'false');};
-layerMenu.onclick=e=>e.stopPropagation();
-document.addEventListener('click',()=>{if(!layerMenu.hidden){layerMenu.hidden=true;layerBtn.classList.remove('on');layerBtn.setAttribute('aria-expanded','false');}});
+const quizBtn=document.getElementById('quizBtn'),quizMenu=document.getElementById('quizMenu');
+const MENUS=[[layerBtn,layerMenu],[quizBtn,quizMenu]];
+function setMenu(btn,menu,open){menu.hidden=!open;btn.classList.toggle('on',open);btn.setAttribute('aria-expanded',open?'true':'false');}
+function closeMenus(){MENUS.forEach(([b,m])=>setMenu(b,m,false));}
+MENUS.forEach(([b,m])=>{b.onclick=e=>{e.stopPropagation();const open=m.hidden;closeMenus();if(open){if(m===quizMenu)syncQuizMenu();setMenu(b,m,true);}};m.onclick=e=>e.stopPropagation();});
+document.addEventListener('click',closeMenus);
+function syncQuizMenu(){document.getElementById('quizMenuBusy').hidden=!QUIZ.active;document.getElementById('quizMenuBody').hidden=QUIZ.active;}
+quizMenu.querySelectorAll('[data-qn]').forEach(b=>b.onclick=()=>{closeMenus();if(!QUIZ.active)startQuiz(+b.dataset.qn);});
+document.getElementById('quizMenuExam').onclick=()=>{closeMenus();if(!QUIZ.active)startExamQuiz();};
 
 /* ---------- quiz ---------- */
 // Doğrulama: tıklanan nokta hedefin alanı içinde ya da çizgisine/sınırına tolerans kadar yakınsa doğru.
@@ -333,11 +389,10 @@ function judge(it,wx,wy){
   const [d,near]=nearestOn(it,wx,wy);
   return {ok:inside||d<=tolKm+(it.tol||0),dist:inside?0:d,near,inside};
 }
-function highlight(it){
+function highlight(it){ // tek öğe ya da öğe dizisi
   const g=document.getElementById('qhl');
-  if(!it||it.kind==='point'){g.innerHTML='';return;}
-  g.innerHTML=it.kind==='area'?`<path d="${it.d}" fill="#1E8F4E" fill-opacity=".28" fill-rule="evenodd" stroke="#0E6B38" stroke-width="2.6" vector-effect="non-scaling-stroke"/>`
-    :lineSvg(it.d,'#12A150',5,true);
+  g.innerHTML=[].concat(it||[]).filter(x=>x.kind!=='point').map(x=>x.kind==='area'?`<path d="${x.d}" fill="#1E8F4E" fill-opacity=".28" fill-rule="evenodd" stroke="#0E6B38" stroke-width="2.6" vector-effect="non-scaling-stroke"/>`
+    :lineSvg(x.d,'#12A150',5,true)).join('');
 }
 function buildQuizPool(){
   let cats=Object.keys(state.on).filter(k=>state.on[k]);
@@ -352,7 +407,7 @@ const qEl=document.getElementById('quizcard');
 (function(){
   let dragging=false,sx0=0,sy0=0,ox=0,oy=0;
   qEl.addEventListener('pointerdown',e=>{
-    if(!e.target.closest('.qtop')||e.target.closest('button'))return;
+    if(!e.target.closest('.qtop')||e.target.closest('button')||qEl.closest('.panel'))return;
     const r=qEl.getBoundingClientRect();
     dragging=true;sx0=e.clientX;sy0=e.clientY;ox=r.left;oy=r.top;
     qEl.style.left=ox+'px';qEl.style.top=oy+'px';qEl.style.right='auto';qEl.style.transform='none';
@@ -412,15 +467,19 @@ function renderQuizCard(){
 }
 function renderQuizDone(){
   const pct=QUIZ.total?Math.round(100*QUIZ.correct/QUIZ.total):0;
+  const res=QUIZ.mode==='exam'?`<div class="qscore">${fmtNet()} net</div><div>${QUIZ.correct} doğru · ${QUIZ.wrong} yanlış · ${QUIZ.total} soru</div><div class="qsrc">Net = doğru − yanlış ÷ 4</div>`
+    :`<div class="qscore">${QUIZ.correct}/${QUIZ.total}</div><div>doğru (%${pct})</div>`;
   qEl.innerHTML=`<div class="qtop"><span>Sonuç</span><button id="qClose" aria-label="Kapat">✕</button></div>
-    <div class="qdone"><div class="qscore">${QUIZ.correct}/${QUIZ.total}</div><div>doğru (%${pct})</div></div>
+    <div class="qdone">${res}</div>
     <div class="qbar"><button id="qAgain">Tekrar oyna</button><button id="qStop" class="ghost">Bitir</button></div>`;
   document.getElementById('qClose').onclick=endQuiz;
   document.getElementById('qAgain').onclick=()=>QUIZ.mode==='exam'?startExamQuiz():startQuiz(QUIZ.asked);
   document.getElementById('qStop').onclick=endQuiz;
-  QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);draw();
+  QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;QUIZ.reveal=null;highlight(null);
+  if(QUIZ.mode==='exam')resetView();else draw();
 }
-function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;resetCardPos();
+function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;QUIZ.reveal=null;highlight(null);qEl.hidden=true;resetCardPos();
+  if(appEl.classList.contains('docked')){appEl.classList.remove('docked');stageEl.insertBefore(qEl,stageEl.querySelector('.zoom'));}
   if(savedLayers){state.on=savedLayers;savedLayers=null;buildToggles();}
   document.querySelector('.modeSel').hidden=false;
   document.getElementById(QUIZ.mode==='exam'?'modeExam':'modeExplore').hidden=false;
@@ -439,33 +498,63 @@ document.querySelectorAll('.modeBtn').forEach(b=>b.onclick=()=>{
   document.getElementById('modeExplore').hidden=exam;
   document.getElementById('modeExam').hidden=!exam;
 });
+const appEl=document.querySelector('.app'),panelEl=document.querySelector('.panel'),stageEl=document.getElementById('stage');
+const fmtNet=()=>(QUIZ.correct-QUIZ.wrong/4).toLocaleString('tr-TR',{maximumFractionDigits:2});
+// şıktaki Romen rakamları ("IV ve V", "I, III ve V", "IV - Nemrut Dağı")
+function romansOf(s){return new Set(String(s).match(/\b(?:IV|V|I{1,3})\b/g)||[]);}
+// şık metnini haritadaki öğeye eşle: önce iller, sonra diğer katmanlar; "Ovası/Gölü/Platosu/çevresi" gibi ekler yok sayılır
+const nrmName=s=>String(s).toLocaleLowerCase('tr').replace(/\s*[-–]\s*/g,'-').replace(/\s+(ovası|polyesi|gölü|dağları|dağı|platosu|çevresi|havzası|nehri|ırmağı|barajı|deltası)$/,'').trim();
+function findItem(name){
+  const layers=['iller',...Object.keys(ITEMS).filter(k=>k!=='iller')],low=s=>String(s).toLocaleLowerCase('tr').trim();
+  // önce birebir ad ("Meriç" → nehir, "Meriç Deltası" değil), sonra eksiz ad
+  for(const [f,n] of [[low,low(name)],[nrmName,nrmName(name)]])
+    for(const l of layers){const it=(ITEMS[l]||[]).find(x=>f(x.name)===n);if(it)return it;}
+  return null;
+}
+function revealFor(q){
+  if(q.reveal)return q.reveal.map(r=>r.lon!==undefined?mk('reveal',{name:r.name,kind:'point',lon:r.lon,lat:r.lat}):findItem(r.name)).filter(Boolean);
+  const ans=q.options[q.answer];
+  const whole=findItem(ans);if(whole)return [whole];
+  const its=ans.split(/\s+[-–]\s+/).map(findItem).filter(Boolean);
+  return its.length?its:null;
+}
 function startExamQuiz(){
   const order=EXAM_Q.map((_,i)=>i);
   for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
-  Object.assign(QUIZ,{active:true,mode:'exam',examOrder:order,idx:0,total:order.length,correct:0,answered:false,selOpt:-1,examQ:null,target:null,guess:null});
+  Object.assign(QUIZ,{active:true,mode:'exam',examOrder:order,idx:0,total:order.length,correct:0,wrong:0,answered:false,selOpt:-1,examQ:null,reveal:null,target:null,guess:null});
   savedLayers={...state.on};
   Object.keys(state.on).forEach(k=>state.on[k]=false);
   buildToggles();buildZones();
   document.querySelector('.modeSel').hidden=true;document.getElementById('modeExplore').hidden=true;document.getElementById('modeExam').hidden=true;
   document.getElementById('items').hidden=true;qEl.hidden=false;buildLegend();
+  // kart sol menünün yerine yerleşir, harita tamamen açık kalır
+  resetCardPos();appEl.classList.add('docked');panelEl.prepend(qEl);
   nextExamQ(false);
 }
 function nextExamQ(advance){
   if(advance)QUIZ.idx++;
-  QUIZ.answered=false;QUIZ.selOpt=-1;
+  QUIZ.answered=false;QUIZ.selOpt=-1;QUIZ.reveal=null;highlight(null);panelEl.scrollTop=0;
+  if(advance)resetView();
   if(QUIZ.idx>=QUIZ.total){QUIZ.examQ=null;renderQuizDone();return;}
   QUIZ.examQ=EXAM_Q[QUIZ.examOrder[QUIZ.idx]];
   renderExamCard();draw();
 }
 function submitExamAnswer(i){
   if(!QUIZ.active||QUIZ.answered)return;
+  const q=QUIZ.examQ;
   QUIZ.answered=true;QUIZ.selOpt=i;
-  if(i===QUIZ.examQ.answer)QUIZ.correct++;
-  renderExamCard();draw();
+  if(i===q.answer)QUIZ.correct++;else QUIZ.wrong++;
+  // doğru şıkkı haritada göster
+  QUIZ.reveal=q.map?null:revealFor(q);
+  renderExamCard();
+  if(QUIZ.reveal){highlight(QUIZ.reveal);
+    const b=QUIZ.reveal.reduce((a,it)=>[Math.min(a[0],it.box[0]),Math.min(a[1],it.box[1]),Math.max(a[2],it.box[2]),Math.max(a[3],it.box[3])],[1e9,1e9,-1e9,-1e9]);
+    focusBox(b,QUIZ.reveal.every(it=>it.kind==='point')?3:4);}
+  else draw();
 }
 function renderExamCard(){
   const q=QUIZ.examQ;
-  let html=`<div class="qtop"><span>Soru ${QUIZ.idx+1}/${QUIZ.total}</span><span>Puan: ${QUIZ.correct}</span><button id="qClose" aria-label="Kapat">✕</button></div>`;
+  let html=`<div class="qtop"><span>Soru ${QUIZ.idx+1}/${QUIZ.total}</span><span title="Net = doğru − yanlış ÷ 4">D ${QUIZ.correct} · Y ${QUIZ.wrong} · <b>Net ${fmtNet()}</b></span><button id="qClose" aria-label="Kapat">✕</button></div>`;
   html+=`<p class="qsrc">${esc(q.exam)}</p><div class="qq">${esc(q.q).replace(/\n/g,'<br>')}</div>`;
   html+='<div class="qopts">'+q.options.map((opt,i)=>{
     let cls='qopt';
@@ -476,6 +565,7 @@ function renderExamCard(){
     const msg=QUIZ.selOpt===q.answer?'✔ Doğru!':`✘ Olmadı — doğru cevap ${String.fromCharCode(65+q.answer)}) ${esc(q.options[q.answer])}.`;
     html+=`<div class="qres ${QUIZ.selOpt===q.answer?'ok':'no'}">${msg}</div>`;
     html+=`<div class="qbar"><button id="qNext">${QUIZ.idx+1>=QUIZ.total?'Sonuçları gör':'Sonraki soru →'}</button></div>`;
+    if(q.map||QUIZ.reveal)html+='<div class="qhint">Doğru cevap haritada yeşil ile gösterildi.</div>';
   } else if(q.map){
     html+='<div class="qhint">Şıklar, haritada işaretlenen yerlere karşılık gelir.</div>';
   }

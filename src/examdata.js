@@ -282,7 +282,8 @@ const EXAM_Q = [
     exam: 'KPSS Lisans 2024 · Genel Kültür',
     q: 'Türkiye\'nin coğrafi konumu ifade edilirken kuzey, güney, doğu ve batı yönlerindeki uç noktalarına da yer verilir.\n\nAşağıdakilerden hangisi bu uç noktalardan biri değildir?',
     options: ['Sinop - İnceburun', 'Dil Yöresi - Dilucu', 'Yayladağı - Topraktutan Köyü', 'Gökçeada - İnceburun', 'İzmir - Karaburun'],
-    answer: 4
+    answer: 4,
+    reveal: [{ name: 'Karaburun (İzmir)', lon: 26.512, lat: 38.637 }]
   },
   {
     id: '2024-lisans-gk-29',
@@ -359,7 +360,8 @@ const EXAM_Q = [
     exam: 'KPSS Lisans 2024 · Genel Kültür',
     q: 'Aşağıdakilerden hangisi Türkiye\'deki linyit kömürü yataklarına sahip alanlardan biri değildir?',
     options: ['Soma', 'Amasra', 'Seyitömer', 'Tavşanlı', 'Elbistan'],
-    answer: 1
+    answer: 1,
+    reveal: [{ name: 'Amasra', lon: 32.386, lat: 41.747 }]
   },
   {
     id: '2024-lisans-gk-39',
@@ -477,7 +479,8 @@ const EXAM_Q = [
     exam: 'KPSS Ön Lisans 2016 · Genel Kültür',
     q: 'Türkiye-Bulgaristan sınırında yer alır. Kara yolu ve demir yolu geçişi vardır. İşlek ve önemli bir gümrük kapısıdır.\n\nBazı özellikleri verilen bu sınır kapısı aşağıdakilerden hangisidir?',
     options: ['Cilvegözü', 'İpsala', 'Kapıkule', 'Gürbulak', 'Habur'],
-    answer: 2
+    answer: 2,
+    reveal: [{ name: 'Kapıkule', lon: 26.359, lat: 41.721 }]
   },
   {
     id: '2016-onlisans-gk-41',
