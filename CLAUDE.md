@@ -23,6 +23,11 @@ python3 build.py     # src/ -> index.html
 - `src/bookmap.py` — şematik (kitap/sınav) haritalarını ICP ile gerçek Türkiye
   sınırına oturtan yardımcı modül; hem kitap katmanları (`build_book_layers.py`)
   hem de aşağıda anlatılan sınav-haritası dijitalleştirmesi bunu kullanır.
+- `src/build_geo2.py`, `build_neighbors.py`, `build_osm.py`, `geo.py`,
+  `il.json` — `geo.json`'u üreten tek seferlik veri betikleri/girdileri
+  (sınırlar, komşular, OSM akarsu/göl/baraj). Normal UI işlerinde dokunulmaz.
+- Arayüzdeki kaynak adı **"Coğrafyanın Kodları KPSS"** (sağ alttaki `.src`
+  ve paneldeki `.disc` notu). Depo içinde bu kitabın dosyası `docs/source.pdf`.
 
 ## Quiz sistemi (iki mod)
 
@@ -34,23 +39,48 @@ python3 build.py     # src/ -> index.html
    `submitExamAnswer()`). Haritalı sorularda `q.map` dizisindeki
    `{roman, lon, lat}` noktaları haritada numaralı/harfli daire olarak
    gösterilir (`renderOverlay()` içindeki "çıkmış soru" bloğu).
+   - **Yerleşik kart:** sınav başlarken `.app`'e `docked` sınıfı eklenir ve
+     `#quizcard` sol `.panel`'in içine taşınır (panelin diğer içeriği CSS ile
+     gizlenir, harita tamamen açık kalır). `endQuiz()` kartı `#stage`'e geri
+     taşır ve sınıfı kaldırır. Yerleşik kart sürüklenmez. Keşif Modu'nda kart
+     haritanın üstünde yüzmeye devam eder.
+   - **Net:** puan yerine KPSS neti gösterilir: `QUIZ.correct - QUIZ.wrong/4`
+     (`fmtNet()`, `tr-TR` biçimi). Sonuç ekranında net, doğru ve yanlış
+     sayısıyla birlikte verilir.
+   - **Doğru şık haritada:** cevaplandıktan sonra doğru cevap yeşil gösterilir
+     (aşağıdaki kurallar).
 
 ### examdata.js formatı
 
-Her soru: `{id, exam, q, options, answer (0-index), map?}`.
+Her soru: `{id, exam, q, options, answer (0-index), map?, reveal?}`.
 
 - `q` metninde madde listeleri (I./II./III.) **mutlaka `\n` ile ayrı satırlara
   bölünmeli** — cümle içine gömülü yazmayın (`"...I. eğitim, II. sağlık..."`
   YANLIŞ). `renderExamCard()` `\n`'i `<br>`'e çevirir ama önce doğru
   yerleştirmeniz gerekir; gerçek KPSS formatında her madde ayrı satırdır.
-- `map` alanı varsa iki durum var:
-  - `map.length === options.length`: her harita işareti tek bir şıkka karşılık
-    gelir (örn. "hangi alanda X görülmez? A)I B)II..."). Cevaplandıktan sonra
-    doğru işaret yeşil, seçilen yanlış işaret kırmızı boyanır.
-  - `map.length !== options.length`: eşleştirme tipi soru (örn. "I,II,III
-    bölgelerinin adları hangi şıkta doğru verilmiştir?"). Bu durumda işaretler
-    her zaman nötr renkte kalır (`perMarkerAnswer` kontrolü, `app.js`). Bu
-    ayrımı bozmayın — yanlış boyama kafa karıştırır.
+- `map` alanı varsa, işaretler **doğru şık metnindeki Romen rakamlarına**
+  göre boyanır (`romansOf()`, `app.js`). Sayılara veya indekslere bakılmaz.
+  - Şıkta Romen rakamı varsa ("II", "IV ve V", "I, III ve V",
+    "IV - Nemrut Dağı"): o işaretler yeşil, kullanıcının seçtiği şıktaki
+    fazladan işaretler kırmızı, diğerleri gri olur. Şık metinlerini bu yüzden
+    Romen rakamlarıyla ve orijinal soruyla birebir yazın.
+  - Şıkta Romen rakamı yoksa ve `' - '` ile bölünmüş parça sayısı
+    `map.length`'e eşitse bu bir eşleştirme sorusudur ("Sultan - Ilgaz -
+    Mercan"): işaretler nötr kalır, yanlarına `I: Sultan` gibi yeşil etiket
+    yazılır.
+  - Hiçbiri değilse (örn. 3 işaret, cevap "Rüzgar") tüm işaretler aynı cevabı
+    gösterir: hepsi yeşil olur ve cevapla etiketlenir.
+- `map` yoksa `revealFor()` doğru şıkkı haritadaki bir öğeye eşlemeye çalışır:
+  önce birebir ad, sonra "Ovası/Polyesi/Gölü/Dağları/Platosu/çevresi/Deltası"
+  gibi ekler atılarak; önce `iller`, sonra diğer katmanlar; gerekirse
+  `' - '` ile bölünen parçalar tek tek. Bulunan öğe yeşil vurgulanır ve
+  harita ona odaklanır (`focusBox`). Kavramsal şıklarda ("Tersiyer",
+  "Yalnız I") haritada bir şey gösterilmez. Bu beklenen davranıştır.
+- `reveal: [{name, lon, lat}]` (isteğe bağlı), `ITEMS`'ta olmayan ya da
+  otomatik eşleşmesi yanlış olacak yerler için kullanılır (Kapıkule, Amasra,
+  Karaburun). Otomatik eşleşmenin önüne geçer. `lon/lat` vermeden
+  `{name}` yazılırsa ad `ITEMS`'ta aranır. Yeni soru eklerken
+  `revealFor(q)` sonucunu tarayıcı konsolunda kontrol edin.
 
 ## Sınav sorularını genişletme iş akışı (docs/exam/*.pdf)
 
@@ -111,14 +141,25 @@ Yeni coğrafya sorusu çıkarmak için:
 Özel bir test framework'ü yok; bu depo statik bir sitedir. Değişiklik sonrası:
 
 ```bash
-python3 -m http.server 8791   # repo kökünden
+python3 -m http.server 8765   # repo kökünden
 ```
 
-sonra Playwright (`npx playwright install chromium` + küçük bir node script)
+(Claude Code masaüstünde `.claude/launch.json` içindeki `harita` yapılandırması
+aynı sunucuyu `preview_start {name:"harita"}` ile açar.) Sonra Playwright (`npx playwright install chromium` + küçük bir node script)
 veya `/run` skill'i ile sürüp ekran görüntüsü alın. Özellikle Çıkmış Sorular
 modunda tüm soruları döngüyle gezip (`.qopt` tıkla → `#qNext` tıkla) konsol
 hatası olmadığını ve harita işaretlerinin (`#over circle`) doğru sayıda
-göründüğünü kontrol edin.
+göründüğünü kontrol edin. Ayrıca:
+
+- Sınav modunda `.panel` içinde yalnızca `#quizcard` görünmeli, ✕ ile menü
+  geri gelmeli (`.app` üzerinde `docked` kalmamalı).
+- Sonuç ekranındaki net, `D - Y/4` ile tutarlı olmalı.
+- Cevap sonrası Romen sorularında yeşil işaret sayısı, doğru şıktaki Romen
+  sayısına eşit olmalı. Yer adlı haritasız sorularda `#qhl` dolmalı ya da
+  yeşil halka çizilmeli.
+- Gizli tarayıcı panelinde `requestAnimationFrame` durabilir. Döngü testinde
+  tıklamadan sonra `renderOverlay()`'i doğrudan çağırın, uzun `await`'lerle
+  beklemeyin (script zaman aşımına uğrar).
 
 ## Git / deploy
 
