@@ -25,6 +25,10 @@ tek dosyalık (self-contained) bir KPSS çalışma haritası. Birincil kaynak
 
 ## Quiz
 
+İki mod var, "🧠 Bilgini test et" kutusundaki düğmelerle seçilir.
+
+### Keşif Modu
+
 5 veya 8 soru, "Daha fazla…" ile 12–100 arası. Sorular aktif katmanlardan gelir.
 Doğrulama merkez noktaya uzaklıkla değil, hedefin geometrisiyle yapılır:
 
@@ -36,6 +40,19 @@ Doğrulama merkez noktaya uzaklıkla değil, hedefin geometrisiyle yapılır:
 Tolerans ekranda ~14 px'e karşılık gelir (en az 8, en çok 30 km); yanlışta
 en yakın mesafe yazılır ve doğru geometri yeşil vurgulanır.
 
+### Çıkmış Sorular
+
+Gerçek KPSS sınavlarından çıkarılmış coğrafya sorularını, orijinal şıklarıyla
+(A-E) sorar (`src/examdata.js`). Haritalı sorularda, orijinal sınavdaki
+numaralandırılmış alanlar aynı Romen rakamlarıyla bizim haritamızda da
+işaretlenir — konumlar, kitap katmanlarını gerçek sınıra oturttuğumuz aynı ICP
+yöntemiyle (`src/bookmap.py`) dijitalleştirildi. Bu soru havuzunu genişletme
+adımları için `CLAUDE.md`'ye bakın.
+
+Soru kartı başlık çubuğundan sürüklenerek haritanın üzerinden taşınabilir.
+Sağ üstteki yakınlaştırma kümesindeki katman ikonlu düğme, masaüstünde sol
+paneli kaydırmadan katmanları açıp kapatmayı sağlar.
+
 ## Dosya yapısı ve üretim
 
 ```
@@ -45,6 +62,7 @@ src/template.html          ← HTML + CSS iskeleti (/*GEO*/ /*DATA*/ /*APP*/)
 src/app.js                 ← çizim, etiket motoru, panel, quiz
 src/data.js                ← elle tutulan veri: volkanlar, horstlar, faylar, akarsu/göl/baraj bilgileri
 src/notes.js               ← KPSS notları (GENERAL + NOTES), kitaba göre
+src/examdata.js            ← gerçek KPSS çıkmış soruları (Çıkmış Sorular modu)
 src/geo.json               ← tüm geometri (ülke, iller, komşular, book.*, osm.*)
 src/bookmap.py             ← kitap haritalarını coğrafi koordinata oturtma (ICP) ve sayısallaştırma yardımcıları
 src/build_book_layers.py   ← kitap sayfalarından geo.json → book.{soils,plateaus,plains,massifs,basins,quake,folds}
