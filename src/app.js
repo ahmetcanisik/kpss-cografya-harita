@@ -16,6 +16,34 @@ const REGION_GEO = REGIONS.map(([full,key,color])=>{
 
 const C={kirik:'#A67C00',kivrim:'#7B4A1E',volkanik:'#C62828',fay:'#D32F2F',masif:'#6B4424',levha:'#3F5E78',sea:'#4B7086',city:'#22303B',goller:'#1F6E96',nehirler:'#1769AA',akarsular:'#3287B8',sinir:'#E07B00',barajlar:'#0D4F7A',komsu:'#385565'};
 const state={on:{kirik:true,kivrim:true,volkanik:true,fay:false,ova:false,plato:false,masif:false,nehirler:false,akarsular:false,sinir:false,goller:false,barajlar:false,havza:false,toprak:false,deprem:false,bolge:false,iller:false,komsu:false,levha:false},cities:true,provNames:true,k:1,tx:0,ty:0};
+/* ---------- açılışta rastgele katmanlar ----------
+   1 katman %30, 2 katman %45, 3 katman %25. Aynı gruptan en fazla "max" kadar katman seçilir ki
+   harita okunur kalsın (örn. iki zemin dolgusu üst üste binmesin). Önceki açılışın kombinasyonu
+   tekrar etmesin diye localStorage'da tutulur. */
+const RANDOM_GROUPS=[
+  {max:1,ls:['toprak','deprem','havza','bolge','iller']}, // zemin dolguları
+  {max:1,ls:['ova','plato','masif']},                     // alanlar
+  {max:1,ls:['nehirler','akarsular','sinir']},            // su çizgileri
+  {max:2,ls:['kirik','kivrim','volkanik','fay']},         // dağlar ve faylar
+  {max:3,ls:['goller','barajlar','komsu']}                // serbest
+];
+const store={get(k){try{return localStorage.getItem(k);}catch(_){return null;}},set(k,v){try{localStorage.setItem(k,v);return true;}catch(_){return false;}}};
+function pickRandomLayers(){
+  const prev=store.get('kpss-last-layers');let pick=[];
+  for(let tries=0;tries<10;tries++){
+    const r=Math.random(),n=r<.3?1:r<.75?2:3;
+    const cand=RANDOM_GROUPS.flatMap(g=>g.ls);
+    for(let i=cand.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cand[i],cand[j]]=[cand[j],cand[i]];}
+    const used=new Map();pick=[];
+    for(const l of cand){if(pick.length>=n)break;const g=RANDOM_GROUPS.find(g=>g.ls.includes(l));
+      if((used.get(g)||0)>=g.max)continue;used.set(g,(used.get(g)||0)+1);pick.push(l);}
+    if(pick.slice().sort().join()!==prev)break;
+  }
+  store.set('kpss-last-layers',pick.slice().sort().join());
+  return pick;
+}
+Object.keys(state.on).forEach(k=>state.on[k]=false);
+pickRandomLayers().forEach(l=>state.on[l]=true);
 const svg=document.getElementById('map'), world=document.getElementById('world'), over=document.getElementById('over'), note=document.getElementById('note');
 let W=800,H=600,fit=1;
 const ctx=document.createElement('canvas').getContext('2d');
@@ -115,7 +143,7 @@ const MARKER={
 };
 const LABEL_ORDER=['bolge','levha','volkanik','barajlar','kirik','kivrim','masif','plato','ova','goller','nehirler','sinir','akarsular','havza','toprak','deprem','komsu'];
 function renderOverlay(){
-  const placed=[]; let out=''; let hidden=0;
+  const placed=[]; let out=''; let hidden=0; labelHits=[];
   const labelsOn=!QUIZ.active;
   const inView=(x,y,m=60)=>x>-m&&x<W+m&&y>-m&&y<H+m;
   const free=(r)=>r.x1>4&&r.x2<W-4&&r.y1>4&&r.y2<H-4&&!placed.some(p=>overlap(r,p));
@@ -125,7 +153,7 @@ function renderOverlay(){
     const s=opt.size||12,w=opt.weight||700,bw=tw(t,s,w,opt.italic),bh=s+2;
     const c=opt.cands||[[9,-bh/2],[-9-bw,-bh/2],[-bw/2,-bh-8],[-bw/2,8],[24,-bh/2-14,1],[-24-bw,-bh/2+14,1],[-bw/2,-bh-26,1],[-bw/2,26,1]];
     for(const [dx,dy,lead] of c){const r={x1:x+dx-2,y1:y+dy-1,x2:x+dx+bw+2,y2:y+dy+bh+1};
-      if(free(r)){placed.push(r);
+      if(free(r)){placed.push(r);if(opt.ref)labelHits.push({r,ref:opt.ref});
         if(lead){const lx=Math.min(Math.max(x,x+dx),x+dx+bw),ly=Math.min(Math.max(y,y+dy),y+dy+bh);out+=`<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${col}" stroke-opacity=".7" stroke-width="1"/>`;}
         out+=txt(t,x+dx,y+dy+s*.84,s,w,col,opt.italic);return true;}}
     hidden++;return false;
@@ -143,16 +171,16 @@ function renderOverlay(){
   cityVisible.forEach(([x,y])=>out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${C.city}" stroke="${C.fay}" stroke-width="1.6"/>`);
   if(labelsOn){
     const provLabels=()=>{if(!(state.on.iller||state.on.bolge)||!state.provNames)return;
-      ITEMS.iller.forEach(it=>{if(it.wx===undefined)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,60))return;const bw=tw(it.name,10.5,700);label(it.name,x,y,C.city,{size:10.5,cands:centered(bw,12.5)});});};
+      ITEMS.iller.forEach((it,i)=>{if(it.wx===undefined)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,60))return;const bw=tw(it.name,10.5,700);label(it.name,x,y,C.city,{size:10.5,cands:centered(bw,12.5),ref:['iller',i]});});};
     LABEL_ORDER.forEach(l=>{if(l==='volkanik')provLabels();if(!state.on[l])return;
-      ITEMS[l].forEach(it=>{if(it.nolabel)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,100))return;
-        if(l==='bolge'){const s=W<480?10.5:12.5,t=it.name.toUpperCase(),bw=tw(t,s,800)+t.length*1.2;label(t,x,y,it.color,{size:s,weight:800,cands:centered(bw,s+2)});return;}
-        if(l==='levha'){const t=it.name,bw=tw(t,15,700);label(t,x,y,C.levha,{size:15,cands:centered(bw,17)});return;}
+      ITEMS[l].forEach((it,i)=>{if(it.nolabel)return;const x=sx(it.wx),y=sy(it.wy);if(!inView(x,y,100))return;const ref=[l,i];
+        if(l==='bolge'){const s=W<480?10.5:12.5,t=it.name.toUpperCase(),bw=tw(t,s,800)+t.length*1.2;label(t,x,y,it.color,{size:s,weight:800,cands:centered(bw,s+2),ref});return;}
+        if(l==='levha'){const t=it.name,bw=tw(t,15,700);label(t,x,y,C.levha,{size:15,cands:centered(bw,17),ref});return;}
         const s=l==='akarsular'||l==='sinir'?11:(it.kind==='area'&&(l==='toprak'||l==='deprem'||l==='havza')?11.5:12);
         const col=l==='toprak'||l==='deprem'||l==='havza'?'#243038':(l==='ova'||l==='plato'?shade(it.color):it.color);
         const italic=l==='nehirler'||l==='akarsular'||l==='sinir';
-        if(it.kind==='area'){const bw=tw(it.name,s,700,italic);label(it.name,x,y,col,{size:s,italic,cands:centered(bw,s+2)});}
-        else label(it.name,x,y,col,{size:s,italic});
+        if(it.kind==='area'){const bw=tw(it.name,s,700,italic);label(it.name,x,y,col,{size:s,italic,cands:centered(bw,s+2),ref});}
+        else label(it.name,x,y,col,{size:s,italic,ref});
       });});
     cityVisible.forEach(([x,y],n)=>label(n,x,y,C.city,{size:10.5,cands:[[7,-6.5],[-7-tw(n,10.5,700),-6.5],[-tw(n,10.5,700)/2,-18],[-tw(n,10.5,700)/2,6]]}));
     SEAS.forEach(s=>{const [wx,wy]=P(s[1],s[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,100))return;const bw=tw(s[0],12,500,true);const r={x1:x-bw/2,y1:y-7,x2:x+bw/2,y2:y+7};
@@ -201,9 +229,12 @@ function renderOverlay(){
       `<path d="M${gx-7},${gy-7}L${gx+7},${gy+7}M${gx-7},${gy+7}L${gx+7},${gy-7}" stroke="#C62828" stroke-width="3.2" stroke-linecap="round"/>`;
   }
   over.innerHTML=out;
+  if(tour.on&&typeof tour.target==='function')positionTour();
   note.textContent=hidden>0?`${hidden} ad sığmadığı için gizlendi. Yakınlaştırınca görünür.`:'';
   note.hidden=hidden===0||QUIZ.active;
 }
+const tour={on:false,i:-1,saved:null,els:null}; // tanıtım turu durumu (aşağıda)
+let labelHits=[]; // son çizimde yerleşen etiketlerin ekran kutuları: {r,ref:[katman,indeks]}
 function shade(hex){const n=parseInt(hex.slice(1),16);const f=.62;return '#'+[n>>16,(n>>8)&255,n&255].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('');}
 
 /* ---------- görünüm ---------- */
@@ -228,6 +259,10 @@ function focusBox(b,minK){
 /* ---------- etkileşim ---------- */
 const ptrs=new Map();let lastD=0,moveDist=0;
 svg.addEventListener('pointerdown',e=>{try{svg.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);lastD=0;svg.classList.add('drag');if(ptrs.size===1)moveDist=0;});
+let hoverRaf=0;
+svg.addEventListener('pointermove',e=>{if(ptrs.size||QUIZ.active||e.pointerType!=='mouse'||hoverRaf)return;
+  hoverRaf=requestAnimationFrame(()=>{hoverRaf=0;const r=svg.getBoundingClientRect();svg.style.cursor=hitTest(e.clientX-r.left,e.clientY-r.top)?'pointer':'';});});
+svg.addEventListener('pointerleave',()=>{svg.style.cursor='';});
 svg.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);
   if(ptrs.size===1){const dx=e.clientX-p[0],dy=e.clientY-p[1];state.tx+=dx;state.ty+=dy;ptrs.set(e.pointerId,[e.clientX,e.clientY]);moveDist+=Math.hypot(dx,dy);draw();}
   else if(ptrs.size===2){ptrs.set(e.pointerId,[e.clientX,e.clientY]);const [a,b]=[...ptrs.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);const r=svg.getBoundingClientRect();
@@ -312,10 +347,19 @@ function openInfo(l,i,opt={}){
     box.querySelectorAll('.kp').forEach(e=>e.hidden=true);box.querySelectorAll('.lst button').forEach(e=>e.setAttribute('aria-expanded','false'));
     if(kp&&!(opt.toggle&&open)){kp.hidden=false;b.setAttribute('aria-expanded','true');}}
   if(opt.focus)focusBox(it.box,it.kind==='point'?4:(l==='bolge'?2:8));
-  else if(b){b.classList.add('sel');b.scrollIntoView({block:'center',behavior:reduce?'auto':'smooth'});}
+  else if(b){b.classList.add('sel');scrollPanelTo(b,true);}
 }
-// haritada tıklanan noktadaki öğe: önce noktalar, sonra çizgiler, sonra en küçük alan
+// masaüstünde yalnızca sol paneli kaydır (scrollIntoView tüm sayfayı da kaydırıp düzeni bozuyor)
+function scrollPanelTo(el,smooth){
+  const behavior=smooth&&!reduce?'smooth':'auto';
+  if(matchMedia('(max-width:900px)').matches){el.scrollIntoView({block:'center',behavior});return;}
+  const pr=panelEl.getBoundingClientRect(),er=el.getBoundingClientRect();
+  panelEl.scrollTo({top:panelEl.scrollTop+er.top-pr.top-(pr.height-er.height)/2,behavior});
+}
+// haritada tıklanan noktadaki öğe: önce etiket isimleri, sonra noktalar, sonra çizgiler, sonra en küçük alan
 function hitTest(cx,cy){
+  const lb=labelHits.find(({r})=>cx>=r.x1-4&&cx<=r.x2+4&&cy>=r.y1-4&&cy<=r.y2+4);
+  if(lb)return lb.ref;
   const [wx,wy]=screenToWorld(cx,cy),kmPx=kmPerWorld(invP(wx,wy)[1]).y/S();
   const layers=[...LABEL_ORDER,'fay','iller'].filter(l=>state.on[l]&&ITEMS[l]);
   let best=null,bd=1e9;
@@ -579,3 +623,145 @@ document.getElementById('examStartBtn').onclick=startExamQuiz;
 buildWorld();buildToggles();refresh();
 new ResizeObserver(resize).observe(svg);resize();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{for(const k in wcache)delete wcache[k];draw();});
+
+/* ---------- açılış ekranı ---------- */
+// yenilemede eski kaydırma konumu geri gelip masaüstü düzenini kaydırmasın
+if('scrollRestoration' in history)history.scrollRestoration='manual';
+// Harita, fontlar ve ilk çizim hazır olana kadar splash kalır; yerleşim oturmadan görünen kaymayı gizler.
+const splashEl=document.getElementById('splash');
+function hideSplash(){if(hideSplash.done)return;hideSplash.done=true;
+  if(splashEl){splashEl.classList.add('out');setTimeout(()=>splashEl.remove(),400);}
+  setTimeout(maybeStartTour,reduce?0:300);}
+(function(){
+  const loaded=new Promise(r=>document.readyState==='complete'?r():addEventListener('load',r,{once:true}));
+  const fonts=document.fonts&&document.fonts.ready?document.fonts.ready.catch(()=>{}):Promise.resolve();
+  const frames=new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const MIN_MS=reduce?0:1300; // sayfa açılışından itibaren, logo animasyonu tamamlansın
+  Promise.all([loaded,fonts,frames]).then(()=>setTimeout(hideSplash,Math.max(0,MIN_MS-performance.now())));
+  setTimeout(hideSplash,4500);
+})();
+
+/* ---------- tanıtım turu ---------- */
+const TOUR_KEY='kpss-intro-v1';
+const isMobile=()=>matchMedia('(max-width:900px)').matches;
+const wait=ms=>new Promise(r=>setTimeout(r,reduce?0:ms));
+function tourSeen(){if(store.get(TOUR_KEY)==='1')return true;try{return sessionStorage.getItem(TOUR_KEY)==='1';}catch(_){return false;}}
+function markTourSeen(){if(!store.set(TOUR_KEY,'1'))try{sessionStorage.setItem(TOUR_KEY,'1');}catch(_){}}
+function maybeStartTour(){if(!tourSeen())startTour();}
+// panel öğesini görünür yap; mobilde yapışkan haritanın altında kalmasın
+function revealEl(el){
+  if(isMobile()){const top=el.getBoundingClientRect().top+scrollY-stageEl.getBoundingClientRect().height-16;window.scrollTo({top:Math.max(0,top),behavior:'auto'});}
+  else scrollPanelTo(el,false);
+}
+function setModeTab(mode){const b=document.querySelector(`.modeBtn[data-mode="${mode}"]`);if(b&&!b.classList.contains('on'))b.click();}
+const yuntIdx=()=>ITEMS.kirik.findIndex(it=>it.name==='Yunt Dağı');
+const TOUR_STEPS=[
+  {title:'Katmanlar',side:['right','bottom','top'],
+   html:`<p>Haritada neyin görüneceğini buradan seçersin. Şu an yalnızca <b>Kırık dağlar</b> açık. Bir satıra dokunarak katmanı açıp kapatabilir, <b>Hepsini aç / Temizle</b> ile hepsini tek seferde yönetebilirsin.</p><p>Her açılışta sana rastgele <b>1–3 katmanla</b> farklı bir harita hazırlarız. Böylece her gelişinde yeni bir konuya göz atarsın.</p>`,
+   enter(){Object.keys(state.on).forEach(k=>state.on[k]=k==='kirik');buildToggles();refresh();resetView();
+     const el=document.querySelector('#toggles input[data-l="kirik"]').closest('.tg');revealEl(el);return el;}},
+  {title:'Harita kontrolleri',side:['left','bottom'],
+   html:`<ul><li><b>+ / −</b> yakınlaştırır, uzaklaştırır (fare tekerleği ya da iki parmakla da olur).</li><li><b>Tümü</b> seni Türkiye'nin tamamına geri götürür.</li><li><b>Katmanlar</b> sol menüye gitmeden katman açıp kapatmanı sağlar.</li><li><b>Soru</b> butonu Keşif Modu'nu ya da Çıkmış Sorular'ı hemen başlatır.</li></ul><p>Bir butonun ne işe yaradığını unutursan üzerine gelmen yeter.</p>`,
+   enter(){closeMenus();if(isMobile())window.scrollTo({top:0,behavior:'auto'});return document.querySelector('.zoom');}},
+  {title:'Haritada bir yer seç',side:['bottom','top','right','left'],
+   html:`<p>İşte <b>Yunt Dağı</b>! Haritadaki bir <b>isme</b>, <b>işarete</b> ya da <b>çizgiye</b> dokunduğunda o yer yeşil ile vurgulanır ve sol menüde o yerin <b>KPSS notları</b> açılır.</p><p>Tersi de geçerli: soldaki listede bir öğeye dokunursan harita seni oraya götürür.</p>`,
+   async enter(){const i=yuntIdx(),it=ITEMS.kirik[i];if(isMobile())window.scrollTo({top:0,behavior:'auto'});
+     if(!state.on.kirik){state.on.kirik=true;buildToggles();refresh();}
+     const [cx,cy]=[(it.box[0]+it.box[2])/2,(it.box[1]+it.box[3])/2],k=Math.min(4,Math.max(2.5,state.k)),s=fit*k;
+     animateTo(k,W/2-cx*s,H/2-cy*s);await wait(430);
+     highlight(it);openInfo('kirik',i);
+     // vurgunun ve ismin ekran kutusu; harita her çizildiğinde yeniden hesaplanır
+     return ()=>{const st=svg.getBoundingClientRect();let x1=sx(it.box[0]),y1=sy(it.box[1]),x2=sx(it.box[2]),y2=sy(it.box[3]);
+       const lb=labelHits.find(h=>h.ref[0]==='kirik'&&h.ref[1]===i);if(lb){x1=Math.min(x1,lb.r.x1);y1=Math.min(y1,lb.r.y1);x2=Math.max(x2,lb.r.x2);y2=Math.max(y2,lb.r.y2);}
+       return {left:st.left+x1-14,top:st.top+y1-14,width:x2-x1+28,height:y2-y1+28};};}},
+  {title:'Soru sistemi: Keşif Modu',side:['right','top','bottom'],
+   html:`<p>Açık katmanlardan rastgele <b>“… nerede?”</b> soruları gelir; cevabı haritaya dokunarak verirsin. Alanın içine ya da çizgiye yakın dokunuşlar doğru sayılır, ıskalarsan kaç km uzakta kaldığını görürsün.</p><p>Soru sayısını seç ve başla. Sağ üstteki <b>soru</b> butonundan da başlatabilirsin.</p>`,
+   enter(){highlight(null);document.querySelectorAll('#items .sel').forEach(e=>e.classList.remove('sel'));setModeTab('explore');const el=document.querySelector('.quizbox');revealEl(el);return el;}},
+  {title:'Soru sistemi: Çıkmış Sorular',side:['right','top','bottom'],
+   html:`<p>Gerçek KPSS sınavlarında çıkmış coğrafya soruları, orijinal <b>A–E şıklarıyla</b>. Haritalı sorularda yerler haritada Romen rakamlarıyla işaretlenir; cevapladıktan sonra doğru yer yeşil ile gösterilir.</p><p>Doğru, yanlış ve <b>net</b> (4 yanlış 1 doğruyu götürür) canlı hesaplanır. Başarılar! 🍀</p>`,
+   enter(){setModeTab('exam');const el=document.querySelector('.quizbox');revealEl(el);return el;}}
+];
+function tourUI(){
+  if(tour.els)return tour.els;
+  const mk=(tag,id)=>{const e=document.createElement(tag);e.id=id;e.hidden=true;document.body.appendChild(e);return e;};
+  const els={block:mk('div','tourBlock'),hole:mk('div','tourHole'),tip:mk('div','tourTip'),welcome:mk('div','tourWelcome')};
+  els.tip.setAttribute('role','dialog');els.tip.setAttribute('aria-live','polite');
+  els.welcome.setAttribute('role','dialog');els.welcome.setAttribute('aria-modal','true');els.welcome.setAttribute('aria-labelledby','twTitle');
+  const onScroll=()=>{if(tour.on&&tour.i>=0)requestAnimationFrame(positionTour);};
+  addEventListener('resize',onScroll);addEventListener('scroll',onScroll,true);
+  document.addEventListener('keydown',e=>{if(!tour.on)return;
+    if(e.key==='Escape'){e.preventDefault();endTour();}
+    else if(tour.i>=0&&e.key==='ArrowRight'){e.preventDefault();tourGo(tour.i+1);}
+    else if(tour.i>0&&e.key==='ArrowLeft'){e.preventDefault();tourGo(tour.i-1);}});
+  return tour.els=els;
+}
+function startTour(){
+  if(tour.on)return;
+  if(QUIZ.active)endQuiz();closeMenus();
+  const els=tourUI();
+  tour.on=true;tour.i=-1;tour.target=null;
+  tour.saved={on:{...state.on},k:state.k,tx:state.tx,ty:state.ty,mode:document.querySelector('.modeBtn.on').dataset.mode,scroll:scrollY,panel:panelEl.scrollTop};
+  els.block.hidden=false;els.block.className='dim';els.hole.hidden=true;els.tip.hidden=true;els.welcome.hidden=false;
+  els.welcome.innerHTML=`<svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><use href="#logo"/></svg>
+    <h2 id="twTitle">Merhaba, hoş geldin! 👋</h2>
+    <p>Bu site, KPSS Coğrafya'nın haritalı konularını tek bir etkileşimli Türkiye haritasında toplar. Ezberlemek yerine <b>görerek</b> çalışman için hazırlandı.</p>
+    <ul>
+      <li><span>🗺️</span><div><b>${Object.keys(LAYER_NAME).length} katman:</b> dağlar, fay hatları, ovalar, platolar, akarsular, göller, barajlar, topraklar, deprem bölgeleri, iller ve komşular.</div></li>
+      <li><span>📌</span><div><b>KPSS notları:</b> haritadaki bir isme ya da işarete dokun, o yer hakkında sınavda işine yarayacak bilgiler açılsın.</div></li>
+      <li><span>🧭</span><div><b>Keşif Modu:</b> “… nerede?” sorularını haritaya dokunarak cevapla.</div></li>
+      <li><span>📝</span><div><b>Çıkmış Sorular:</b> gerçek KPSS coğrafya sorularını şıklı çöz, netini gör.</div></li>
+    </ul>
+    <p>Kısa bir turla nerede ne olduğunu gösterelim mi? Bir dakika bile sürmez.</p>
+    <div class="tnav"><button class="tbtn ghost" type="button" data-a="skip">Şimdilik geç</button><button class="tbtn" type="button" data-a="go">Turu başlat →</button></div>`;
+  els.welcome.querySelector('[data-a="skip"]').onclick=endTour;
+  els.welcome.querySelector('[data-a="go"]').onclick=()=>tourGo(0);
+  els.welcome.querySelector('[data-a="go"]').focus();
+}
+async function tourGo(i){
+  if(!tour.on)return;
+  if(i>=TOUR_STEPS.length){endTour();return;}
+  const els=tour.els,step=TOUR_STEPS[i],token={};tour.token=token;tour.i=i;
+  els.welcome.hidden=true;els.block.className='';els.tip.hidden=true;
+  const target=await step.enter();
+  if(tour.token!==token||!tour.on)return; // bu arada başka adıma geçildi
+  tour.target=target;
+  const last=i===TOUR_STEPS.length-1;
+  els.tip.innerHTML=`<div class="st">Adım ${i+1} / ${TOUR_STEPS.length}</div><h3>${step.title}</h3>${step.html}
+    <div class="tnav"><div class="dots" aria-hidden="true">${TOUR_STEPS.map((_,j)=>`<i class="${j===i?'on':''}"></i>`).join('')}</div>
+    ${i>0?'<button class="tbtn ghost" type="button" data-a="prev">Geri</button>':'<button class="tbtn ghost" type="button" data-a="end">Turu kapat</button>'}
+    <button class="tbtn" type="button" data-a="next">${last?'Haydi başlayalım! 🎉':'İleri →'}</button></div>`;
+  els.tip.setAttribute('aria-label',step.title);
+  els.tip.querySelector('[data-a="next"]').onclick=()=>tourGo(i+1);
+  const pv=els.tip.querySelector('[data-a="prev"]');if(pv)pv.onclick=()=>tourGo(i-1);
+  const en=els.tip.querySelector('[data-a="end"]');if(en)en.onclick=endTour;
+  els.hole.hidden=false;els.tip.hidden=false;
+  positionTour();
+  els.tip.querySelector('[data-a="next"]').focus({preventScroll:true});
+}
+function positionTour(){
+  if(!tour.on||tour.i<0||!tour.target)return;
+  const {hole,tip}=tour.els,t=tour.target,pad=8;
+  const b=typeof t==='function'?t():t.getBoundingClientRect();
+  const r={left:b.left-pad,top:b.top-pad,width:b.width+pad*2,height:b.height+pad*2};r.right=r.left+r.width;r.bottom=r.top+r.height;
+  Object.assign(hole.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
+  const vw=innerWidth,vh=innerHeight,tw=tip.offsetWidth,th=tip.offsetHeight,m=14,e=12;
+  const fits={right:r.right+m+tw<=vw-e,left:r.left-m-tw>=e,bottom:r.bottom+m+th<=vh-e,top:r.top-m-th>=e};
+  const side=TOUR_STEPS[tour.i].side.find(s=>fits[s]);let x,y;
+  if(side==='right'){x=r.right+m;y=r.top;}
+  else if(side==='left'){x=r.left-m-tw;y=r.top;}
+  else if(side==='bottom'){x=r.left+r.width/2-tw/2;y=r.bottom+m;}
+  else if(side==='top'){x=r.left+r.width/2-tw/2;y=r.top-m-th;}
+  else{x=(vw-tw)/2;y=vh-th-e;} // hiçbir yana sığmıyorsa alta sabitle
+  tip.style.left=Math.min(Math.max(x,e),vw-tw-e)+'px';tip.style.top=Math.min(Math.max(y,e),vh-th-e)+'px';
+}
+function endTour(){
+  if(!tour.on)return;
+  const {block,hole,tip,welcome}=tour.els,sv=tour.saved;
+  tour.on=false;tour.i=-1;tour.target=null;tour.token=null;
+  [block,hole,tip,welcome].forEach(e=>e.hidden=true);
+  markTourSeen();
+  if(sv){state.on=sv.on;buildToggles();refresh();setModeTab(sv.mode);animateTo(sv.k,sv.tx,sv.ty);
+    panelEl.scrollTop=sv.panel;if(isMobile())window.scrollTo({top:sv.scroll,behavior:'auto'});}
+  document.getElementById('tourAgain').blur();
+}
+document.getElementById('tourAgain').onclick=startTour;

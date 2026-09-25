@@ -29,6 +29,25 @@ python3 build.py     # src/ -> index.html
 - Arayüzdeki kaynak adı **"Coğrafyanın Kodları KPSS"** (sağ alttaki `.src`
   ve paneldeki `.disc` notu). Depo içinde bu kitabın dosyası `docs/source.pdf`.
 
+## Açılış, rastgele katmanlar ve tanıtım turu
+
+- **Logo**: `template.html`'de gizli sprite `<symbol id="logo">`; başlık, tur ve
+  "Tekrardan tanışalım" butonu `<use href="#logo">` ile kullanır. Favicon aynı
+  çizimin data-URI kopyasıdır — logoyu değiştirirseniz ikisini birlikte güncelleyin.
+- **Splash** (`#splash`): büyük inline script'ten önce gelir; `app.js` sonunda
+  `load` + `document.fonts.ready` + ilk çizim sonrası (en az 1.3 sn, en fazla
+  4.5 sn) kaldırılır.
+- **Rastgele katmanlar**: `pickRandomLayers()` + `RANDOM_GROUPS` (app.js başı).
+  1/2/3 katman %30/%45/%25; her gruptan en fazla `max` katman; önceki açılışın
+  kombinasyonu `localStorage['kpss-last-layers']` ile tekrar edilmez.
+- **Harita tıklama**: `renderOverlay()` yerleşen her etiketin kutusunu
+  `labelHits`'e yazar; `hitTest()` önce isimlere, sonra nokta/çizgi/alana bakar.
+- **Tanıtım turu**: `TOUR_STEPS` (app.js sonu), ilk ziyarette otomatik açılır
+  (`localStorage['kpss-intro-v1']`), sol menüdeki `#tourAgain` ile yeniden
+  başlar. Turdan önce katmanlar/görünüm/mod sekmesi saklanıp bitişte geri
+  yüklenir. Masaüstünde paneli `scrollPanelTo()` ile kaydırın —
+  `scrollIntoView` tüm sayfayı kaydırıp düzeni bozuyor.
+
 ## Quiz sistemi (iki mod)
 
 1. **Keşif Modu** (`QUIZ.mode==='explore'`) — aktif katmanlardaki öğelerden
