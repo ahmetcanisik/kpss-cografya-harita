@@ -303,11 +303,14 @@ const LAYERS=[
 ];
 const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
-  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`+
-    (id==='iller'&&(state.on.iller||state.on.bolge)?`<label class="tgsub"><input type="checkbox" data-pn ${state.provNames?'checked':''}> İl adlarını göster</label>`:'')).join('')).join('');
+  const html=LAYERS.map(([g,ls],gi)=>{const n=ls.filter(([id])=>state.on[id]).length;
+    return `<div class="tgh"><span>${g} <em>${n}/${ls.length}</em></span><button type="button" class="tgall" data-g="${gi}">${n===ls.length?'Kapat':'Hepsini aç'}</button></div>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`+
+    (id==='iller'&&(state.on.iller||state.on.bolge)?`<label class="tgsub"><input type="checkbox" data-pn ${state.provNames?'checked':''}> İl adlarını göster</label>`:'')).join('');}).join('');
   [document.getElementById('toggles'),document.getElementById('togglesMap')].forEach(el=>{
     el.innerHTML=html;
     el.querySelectorAll('input[data-l]').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+    el.querySelectorAll('.tgall').forEach(b=>b.onclick=e=>{e.stopPropagation();const ls=LAYERS[b.dataset.g][1],on=!ls.every(([id])=>state.on[id]);
+      ls.forEach(([id])=>state.on[id]=on);buildToggles();refresh();});
     el.querySelectorAll('input[data-pn]').forEach(i=>i.onchange=()=>{state.provNames=i.checked;buildToggles();draw();});
   });
 }
