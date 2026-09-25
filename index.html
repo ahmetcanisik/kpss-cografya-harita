@@ -122,6 +122,10 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 
 .tgh{margin:14px 0 4px 10px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .tgh:first-child{margin-top:4px}
+.tgh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-right:4px}
+.tgh em{font-style:normal;font-weight:500;letter-spacing:0;opacity:.8}
+.tgall{flex:none;text-transform:none;letter-spacing:0;font:600 11px "Instrument Sans",sans-serif;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer}
+.tgall:hover{filter:brightness(1.1)}
 .items .grp{margin:10px 0 2px 8px;font-size:12px;font-weight:600;color:var(--accent)}
 .ar{width:12px;height:10px;border-radius:3px;background:var(--c);flex:none;margin-top:5px;box-shadow:0 0 0 1.5px #E3E9D8;opacity:.9}
 .qcat{margin:-4px 0 8px;font-size:12px;color:var(--ink-2)}
@@ -1686,11 +1690,14 @@ const LAYERS=[
 ];
 const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
-  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`+
-    (id==='iller'&&(state.on.iller||state.on.bolge)?`<label class="tgsub"><input type="checkbox" data-pn ${state.provNames?'checked':''}> İl adlarını göster</label>`:'')).join('')).join('');
+  const html=LAYERS.map(([g,ls],gi)=>{const n=ls.filter(([id])=>state.on[id]).length;
+    return `<div class="tgh"><span>${g} <em>${n}/${ls.length}</em></span><button type="button" class="tgall" data-g="${gi}">${n===ls.length?'Kapat':'Hepsini aç'}</button></div>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`+
+    (id==='iller'&&(state.on.iller||state.on.bolge)?`<label class="tgsub"><input type="checkbox" data-pn ${state.provNames?'checked':''}> İl adlarını göster</label>`:'')).join('');}).join('');
   [document.getElementById('toggles'),document.getElementById('togglesMap')].forEach(el=>{
     el.innerHTML=html;
     el.querySelectorAll('input[data-l]').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+    el.querySelectorAll('.tgall').forEach(b=>b.onclick=e=>{e.stopPropagation();const ls=LAYERS[b.dataset.g][1],on=!ls.every(([id])=>state.on[id]);
+      ls.forEach(([id])=>state.on[id]=on);buildToggles();refresh();});
     el.querySelectorAll('input[data-pn]').forEach(i=>i.onchange=()=>{state.provNames=i.checked;buildToggles();draw();});
   });
 }
