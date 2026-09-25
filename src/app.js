@@ -248,9 +248,11 @@ const LAYERS=[
 ];
 const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
-  const el=document.getElementById('toggles');
-  el.innerHTML=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
-  el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;refresh();});
+  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
+  [document.getElementById('toggles'),document.getElementById('togglesMap')].forEach(el=>{
+    el.innerHTML=html;
+    el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+  });
 }
 function refresh(){buildZones();buildList();buildLegend();draw();document.getElementById('citiesRow').hidden=!state.on.fay;}
 function bl(ul){return `<ul>${ul.map(t=>`<li>${t}</li>`).join('')}</ul>`;}
@@ -288,8 +290,18 @@ function buildLegend(){
   el.innerHTML=ls.map(l=>`<b>${LAYER_NAME[l]}</b>`+ITEMS[l].map(it=>`<span><i style="background:${it.key==='kirecli'?'repeating-linear-gradient(45deg,#8FD4F5 0 3px,#2F6F95 3px 4.5px)':it.color}"></i>${esc(it.name)}</span>`).join('')).join('');
 }
 document.getElementById('showCities').onchange=e=>{state.cities=e.target.checked;draw();};
-document.getElementById('all').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=!['toprak','deprem','havza','bolge','iller'].includes(k));buildToggles();refresh();};
-document.getElementById('none').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=false);buildToggles();refresh();};
+function selectAllLayers(){Object.keys(state.on).forEach(k=>state.on[k]=!['toprak','deprem','havza','bolge','iller'].includes(k));buildToggles();refresh();}
+function clearAllLayers(){Object.keys(state.on).forEach(k=>state.on[k]=false);buildToggles();refresh();}
+document.getElementById('all').onclick=selectAllLayers;
+document.getElementById('none').onclick=clearAllLayers;
+document.getElementById('allMap').onclick=selectAllLayers;
+document.getElementById('noneMap').onclick=clearAllLayers;
+
+/* ---------- katman açılır menüsü (sağ üst) ---------- */
+const layerBtn=document.getElementById('layerBtn'),layerMenu=document.getElementById('layerMenu');
+layerBtn.onclick=e=>{e.stopPropagation();const open=layerMenu.hidden;layerMenu.hidden=!open;layerBtn.classList.toggle('on',open);layerBtn.setAttribute('aria-expanded',open?'true':'false');};
+layerMenu.onclick=e=>e.stopPropagation();
+document.addEventListener('click',()=>{if(!layerMenu.hidden){layerMenu.hidden=true;layerBtn.classList.remove('on');layerBtn.setAttribute('aria-expanded','false');}});
 
 /* ---------- quiz ---------- */
 // Doğrulama: tıklanan nokta hedefin alanı içinde ya da çizgisine/sınırına tolerans kadar yakınsa doğru.
@@ -336,6 +348,28 @@ function buildQuizPool(){
   return pool;
 }
 const qEl=document.getElementById('quizcard');
+/* ---------- soru kartını sürükleyerek taşıma ---------- */
+(function(){
+  let dragging=false,sx0=0,sy0=0,ox=0,oy=0;
+  qEl.addEventListener('pointerdown',e=>{
+    if(!e.target.closest('.qtop')||e.target.closest('button'))return;
+    const r=qEl.getBoundingClientRect();
+    dragging=true;sx0=e.clientX;sy0=e.clientY;ox=r.left;oy=r.top;
+    qEl.style.left=ox+'px';qEl.style.top=oy+'px';qEl.style.right='auto';qEl.style.transform='none';
+    qEl.setPointerCapture(e.pointerId);
+  });
+  qEl.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const pw=qEl.parentElement.clientWidth,ph=qEl.parentElement.clientHeight;
+    const nx=Math.min(Math.max(ox+e.clientX-sx0,-qEl.offsetWidth+40),pw-40);
+    const ny=Math.min(Math.max(oy+e.clientY-sy0,0),ph-40);
+    qEl.style.left=nx+'px';qEl.style.top=ny+'px';
+  });
+  const stopDrag=()=>{dragging=false;};
+  qEl.addEventListener('pointerup',stopDrag);
+  qEl.addEventListener('pointercancel',stopDrag);
+})();
+function resetCardPos(){qEl.style.left='';qEl.style.top='';qEl.style.right='';qEl.style.transform='';}
 function startQuiz(n){
   const pool=buildQuizPool();
   Object.assign(QUIZ,{active:true,mode:'explore',asked:n,pool:pool.slice(0,Math.min(n,pool.length)),idx:0,correct:0,answered:false,guess:null,target:null});
@@ -386,7 +420,7 @@ function renderQuizDone(){
   document.getElementById('qStop').onclick=endQuiz;
   QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);draw();
 }
-function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;
+function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;resetCardPos();
   if(savedLayers){state.on=savedLayers;savedLayers=null;buildToggles();}
   document.querySelector('.modeSel').hidden=false;
   document.getElementById(QUIZ.mode==='exam'?'modeExam':'modeExplore').hidden=false;
