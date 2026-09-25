@@ -468,7 +468,7 @@ const EXAM_Q = [
   {
     id: '2016-onlisans-gk-39',
     exam: 'KPSS Ön Lisans 2016 · Genel Kültür',
-    q: 'Türkiye\'de turizm, 1980\'lerden itibaren gelişme göstermeye ve bu doğrultuda turizm çeşitliliği son yıllarda artmaya başlamıştır.\n\nBuna göre Türkiye\'de I. ekoturizm, II. golf turizmi, III. kültür turizmi, IV. deniz ve kıyı turizmi türlerinden hangileri diğerlerine göre daha fazla turist çekmektedir?',
+    q: 'Türkiye\'de turizm, 1980\'lerden itibaren gelişme göstermeye ve bu doğrultuda turizm çeşitliliği son yıllarda artmaya başlamıştır.\n\nBuna göre Türkiye\'de\nI. ekoturizm,\nII. golf turizmi,\nIII. kültür turizmi,\nIV. deniz ve kıyı turizmi\ntürlerinden hangileri diğerlerine göre daha fazla turist çekmektedir?',
     options: ['I ve II', 'I ve III', 'II ve III', 'II ve IV', 'III ve IV'],
     answer: 4
   },
@@ -572,7 +572,7 @@ const EXAM_Q = [
   {
     id: '2018-onlisans-gk-36',
     exam: 'KPSS Ön Lisans 2018 · Genel Kültür',
-    q: 'Türkiye\'de nüfusun göç yoluyla arttığı yerlerde genellikle erkek nüfus oranının fazla olduğu görülür.\n\nBu durum, I. eğitim, II. sağlık, III. istihdam faktörlerinden hangileriyle ilişkilidir?',
+    q: 'Türkiye\'de nüfusun göç yoluyla arttığı yerlerde genellikle erkek nüfus oranının fazla olduğu görülür.\n\nBu durum,\nI. eğitim,\nII. sağlık,\nIII. istihdam\nfaktörlerinden hangileriyle ilişkilidir?',
     options: ['Yalnız I', 'Yalnız II', 'Yalnız III', 'I ve II', 'II ve III'],
     answer: 2
   },
@@ -593,7 +593,7 @@ const EXAM_Q = [
   {
     id: '2018-onlisans-gk-42',
     exam: 'KPSS Ön Lisans 2018 · Genel Kültür',
-    q: 'Türkiye\'de geçmişten günümüze gelişen bir iç ticaret faaliyeti görülür.\n\nBu durumun oluşmasında; I. ülkede eğitim seviyesinin yükselmesi, II. şehirlerde yaşayan nüfusun artması, III. ulaşım hizmetlerinin ülke genelinde gelişmesi, IV. ülkenin üç tarafının denizlerle çevrili olması gibi faktörlerden hangileri daha fazla etkili olmuştur?',
+    q: 'Türkiye\'de geçmişten günümüze gelişen bir iç ticaret faaliyeti görülür.\n\nBu durumun oluşmasında;\nI. ülkede eğitim seviyesinin yükselmesi,\nII. şehirlerde yaşayan nüfusun artması,\nIII. ulaşım hizmetlerinin ülke genelinde gelişmesi,\nIV. ülkenin üç tarafının denizlerle çevrili olması\ngibi faktörlerden hangileri daha fazla etkili olmuştur?',
     options: ['I ve II', 'I ve III', 'II ve III', 'II ve IV', 'III ve IV'],
     answer: 2
   },

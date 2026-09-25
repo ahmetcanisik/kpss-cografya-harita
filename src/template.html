@@ -56,11 +56,18 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 #map.drag{cursor:grabbing}
 #map:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .lb{paint-order:stroke;stroke:rgba(255,255,255,.93);stroke-width:3.4px;stroke-linejoin:round;font-family:"Instrument Sans",system-ui,sans-serif;pointer-events:none}
-.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
+.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:visible;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
 .zoom button{width:42px;height:42px;padding:0;display:grid;place-items:center;font:600 20px "Instrument Sans",sans-serif;color:#16262E;background:#fff;border:0;border-bottom:1px solid #DDE4DA;cursor:pointer}
-.zoom button:last-child{border-bottom:0;font-size:11.5px;letter-spacing:0}
+.zoom button:first-child{border-radius:12px 12px 0 0}
+.zoom button#zreset{font-size:11.5px;letter-spacing:0}
+.zoom button#layerBtn{border-bottom:0;border-radius:0 0 12px 12px}
+.zoom button#layerBtn.on{background:#EEF3EA;color:var(--accent-ink,#16262E)}
 .zoom button:hover{background:#EEF3EA}
 .zoom button:focus-visible{outline:2px solid #16262E;outline-offset:-4px}
+.layerMenu{position:absolute;top:100%;right:0;margin-top:8px;width:264px;max-height:min(560px,70vh);overflow:auto;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px rgba(15,28,34,.32);padding:10px;z-index:6}
+.layerMenu .bar{display:flex;gap:6px;margin-bottom:8px}
+.layerMenu .bar button{flex:1;font:600 11.5px "Instrument Sans",sans-serif;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;color:var(--ink)}
+.layerMenu .bar button:hover{filter:brightness(1.15)}
 .note{position:absolute;left:14px;bottom:14px;max-width:calc(100% - 28px);background:rgba(22,38,46,.88);color:#EAF0EC;font-size:12.5px;padding:6px 12px;border-radius:999px}
 .src{position:absolute;right:14px;bottom:12px;font-size:11px;color:#3B5566;background:rgba(255,255,255,.7);padding:2px 8px;border-radius:6px}
 .quizbox{margin:0 0 18px;padding:12px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
@@ -83,7 +90,7 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 .qcustom input{width:100%;accent-color:var(--accent)}
 .qcustom output{min-width:56px;text-align:center;font-size:12px;color:var(--ink)}
 .qstage{position:absolute;z-index:3;top:16px;left:50%;width:min(380px,calc(100% - 32px));transform:translateX(-50%);padding:12px 14px;background:rgba(16,30,37,.94);border:1px solid rgba(232,176,74,.65);border-radius:14px;box-shadow:0 8px 24px rgba(15,28,34,.28);color:var(--ink)}
-.qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px}
+.qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px;cursor:move;touch-action:none;user-select:none}
 .qtop button{margin-left:auto;width:26px;height:26px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:50%;cursor:pointer}
 .qq{margin:10px 0 8px;font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:17px;line-height:1.2}
 .qq b{color:var(--accent)}
@@ -184,7 +191,22 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
       <g id="world"></g><g id="over"></g>
     </svg>
     <div id="quizcard" class="qstage" hidden></div>
-    <div class="zoom"><button id="zin" type="button" aria-label="Yakınlaştır">+</button><button id="zout" type="button" aria-label="Uzaklaştır">−</button><button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button></div>
+    <div class="zoom">
+      <button id="zin" type="button" aria-label="Yakınlaştır">+</button>
+      <button id="zout" type="button" aria-label="Uzaklaştır">−</button>
+      <button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button>
+      <button id="layerBtn" type="button" aria-label="Katmanlar" aria-haspopup="true" aria-expanded="false">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3 2 8l10 5 10-5-10-5Z" fill="currentColor"/>
+          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 16l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="layerMenu" id="layerMenu" hidden>
+        <div class="bar"><button id="allMap" type="button">Hepsini aç</button><button id="noneMap" type="button">Temizle</button></div>
+        <div id="togglesMap"></div>
+      </div>
+    </div>
     <div class="legend" id="legend" hidden></div>
     <div class="note" id="note" hidden></div>
     <div class="src">Kaynak: docs/source.pdf · Sınırlar: Natural Earth, il verisi · Akarsu/göl: © OpenStreetMap</div>

@@ -56,11 +56,18 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 #map.drag{cursor:grabbing}
 #map:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .lb{paint-order:stroke;stroke:rgba(255,255,255,.93);stroke-width:3.4px;stroke-linejoin:round;font-family:"Instrument Sans",system-ui,sans-serif;pointer-events:none}
-.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
+.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;border-radius:12px;overflow:visible;box-shadow:0 1px 0 rgba(0,0,0,.12),0 4px 14px rgba(15,28,34,.22)}
 .zoom button{width:42px;height:42px;padding:0;display:grid;place-items:center;font:600 20px "Instrument Sans",sans-serif;color:#16262E;background:#fff;border:0;border-bottom:1px solid #DDE4DA;cursor:pointer}
-.zoom button:last-child{border-bottom:0;font-size:11.5px;letter-spacing:0}
+.zoom button:first-child{border-radius:12px 12px 0 0}
+.zoom button#zreset{font-size:11.5px;letter-spacing:0}
+.zoom button#layerBtn{border-bottom:0;border-radius:0 0 12px 12px}
+.zoom button#layerBtn.on{background:#EEF3EA;color:var(--accent-ink,#16262E)}
 .zoom button:hover{background:#EEF3EA}
 .zoom button:focus-visible{outline:2px solid #16262E;outline-offset:-4px}
+.layerMenu{position:absolute;top:100%;right:0;margin-top:8px;width:264px;max-height:min(560px,70vh);overflow:auto;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px rgba(15,28,34,.32);padding:10px;z-index:6}
+.layerMenu .bar{display:flex;gap:6px;margin-bottom:8px}
+.layerMenu .bar button{flex:1;font:600 11.5px "Instrument Sans",sans-serif;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;color:var(--ink)}
+.layerMenu .bar button:hover{filter:brightness(1.15)}
 .note{position:absolute;left:14px;bottom:14px;max-width:calc(100% - 28px);background:rgba(22,38,46,.88);color:#EAF0EC;font-size:12.5px;padding:6px 12px;border-radius:999px}
 .src{position:absolute;right:14px;bottom:12px;font-size:11px;color:#3B5566;background:rgba(255,255,255,.7);padding:2px 8px;border-radius:6px}
 .quizbox{margin:0 0 18px;padding:12px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
@@ -83,7 +90,7 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 .qcustom input{width:100%;accent-color:var(--accent)}
 .qcustom output{min-width:56px;text-align:center;font-size:12px;color:var(--ink)}
 .qstage{position:absolute;z-index:3;top:16px;left:50%;width:min(380px,calc(100% - 32px));transform:translateX(-50%);padding:12px 14px;background:rgba(16,30,37,.94);border:1px solid rgba(232,176,74,.65);border-radius:14px;box-shadow:0 8px 24px rgba(15,28,34,.28);color:var(--ink)}
-.qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px}
+.qtop{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12px;cursor:move;touch-action:none;user-select:none}
 .qtop button{margin-left:auto;width:26px;height:26px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:50%;cursor:pointer}
 .qq{margin:10px 0 8px;font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:17px;line-height:1.2}
 .qq b{color:var(--accent)}
@@ -184,7 +191,22 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
       <g id="world"></g><g id="over"></g>
     </svg>
     <div id="quizcard" class="qstage" hidden></div>
-    <div class="zoom"><button id="zin" type="button" aria-label="Yakınlaştır">+</button><button id="zout" type="button" aria-label="Uzaklaştır">−</button><button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button></div>
+    <div class="zoom">
+      <button id="zin" type="button" aria-label="Yakınlaştır">+</button>
+      <button id="zout" type="button" aria-label="Uzaklaştır">−</button>
+      <button id="zreset" type="button" aria-label="Görünümü sıfırla">Tümü</button>
+      <button id="layerBtn" type="button" aria-label="Katmanlar" aria-haspopup="true" aria-expanded="false">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3 2 8l10 5 10-5-10-5Z" fill="currentColor"/>
+          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 16l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="layerMenu" id="layerMenu" hidden>
+        <div class="bar"><button id="allMap" type="button">Hepsini aç</button><button id="noneMap" type="button">Temizle</button></div>
+        <div id="togglesMap"></div>
+      </div>
+    </div>
     <div class="legend" id="legend" hidden></div>
     <div class="note" id="note" hidden></div>
     <div class="src">Kaynak: docs/source.pdf · Sınırlar: Natural Earth, il verisi · Akarsu/göl: © OpenStreetMap</div>
@@ -1089,7 +1111,7 @@ const EXAM_Q = [
   {
     id: '2016-onlisans-gk-39',
     exam: 'KPSS Ön Lisans 2016 · Genel Kültür',
-    q: 'Türkiye\'de turizm, 1980\'lerden itibaren gelişme göstermeye ve bu doğrultuda turizm çeşitliliği son yıllarda artmaya başlamıştır.\n\nBuna göre Türkiye\'de I. ekoturizm, II. golf turizmi, III. kültür turizmi, IV. deniz ve kıyı turizmi türlerinden hangileri diğerlerine göre daha fazla turist çekmektedir?',
+    q: 'Türkiye\'de turizm, 1980\'lerden itibaren gelişme göstermeye ve bu doğrultuda turizm çeşitliliği son yıllarda artmaya başlamıştır.\n\nBuna göre Türkiye\'de\nI. ekoturizm,\nII. golf turizmi,\nIII. kültür turizmi,\nIV. deniz ve kıyı turizmi\ntürlerinden hangileri diğerlerine göre daha fazla turist çekmektedir?',
     options: ['I ve II', 'I ve III', 'II ve III', 'II ve IV', 'III ve IV'],
     answer: 4
   },
@@ -1193,7 +1215,7 @@ const EXAM_Q = [
   {
     id: '2018-onlisans-gk-36',
     exam: 'KPSS Ön Lisans 2018 · Genel Kültür',
-    q: 'Türkiye\'de nüfusun göç yoluyla arttığı yerlerde genellikle erkek nüfus oranının fazla olduğu görülür.\n\nBu durum, I. eğitim, II. sağlık, III. istihdam faktörlerinden hangileriyle ilişkilidir?',
+    q: 'Türkiye\'de nüfusun göç yoluyla arttığı yerlerde genellikle erkek nüfus oranının fazla olduğu görülür.\n\nBu durum,\nI. eğitim,\nII. sağlık,\nIII. istihdam\nfaktörlerinden hangileriyle ilişkilidir?',
     options: ['Yalnız I', 'Yalnız II', 'Yalnız III', 'I ve II', 'II ve III'],
     answer: 2
   },
@@ -1214,7 +1236,7 @@ const EXAM_Q = [
   {
     id: '2018-onlisans-gk-42',
     exam: 'KPSS Ön Lisans 2018 · Genel Kültür',
-    q: 'Türkiye\'de geçmişten günümüze gelişen bir iç ticaret faaliyeti görülür.\n\nBu durumun oluşmasında; I. ülkede eğitim seviyesinin yükselmesi, II. şehirlerde yaşayan nüfusun artması, III. ulaşım hizmetlerinin ülke genelinde gelişmesi, IV. ülkenin üç tarafının denizlerle çevrili olması gibi faktörlerden hangileri daha fazla etkili olmuştur?',
+    q: 'Türkiye\'de geçmişten günümüze gelişen bir iç ticaret faaliyeti görülür.\n\nBu durumun oluşmasında;\nI. ülkede eğitim seviyesinin yükselmesi,\nII. şehirlerde yaşayan nüfusun artması,\nIII. ulaşım hizmetlerinin ülke genelinde gelişmesi,\nIV. ülkenin üç tarafının denizlerle çevrili olması\ngibi faktörlerden hangileri daha fazla etkili olmuştur?',
     options: ['I ve II', 'I ve III', 'II ve III', 'II ve IV', 'III ve IV'],
     answer: 2
   },
@@ -1496,9 +1518,11 @@ const LAYERS=[
 ];
 const LAYER_NAME=Object.fromEntries(LAYERS.flatMap(g=>g[1]).map(l=>[l[0],l[1]]));
 function buildToggles(){
-  const el=document.getElementById('toggles');
-  el.innerHTML=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
-  el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;refresh();});
+  const html=LAYERS.map(([g,ls])=>`<p class="tgh">${g}</p>`+ls.map(([id,t,s])=>`<label class="tg"><input type="checkbox" data-l="${id}" ${state.on[id]?'checked':''}><span class="sw">${swatch[id]}</span><span class="tt"><b>${t}</b><small>${s}</small></span></label>`).join('')).join('');
+  [document.getElementById('toggles'),document.getElementById('togglesMap')].forEach(el=>{
+    el.innerHTML=html;
+    el.querySelectorAll('input').forEach(i=>i.onchange=()=>{state.on[i.dataset.l]=i.checked;buildToggles();refresh();});
+  });
 }
 function refresh(){buildZones();buildList();buildLegend();draw();document.getElementById('citiesRow').hidden=!state.on.fay;}
 function bl(ul){return `<ul>${ul.map(t=>`<li>${t}</li>`).join('')}</ul>`;}
@@ -1536,8 +1560,18 @@ function buildLegend(){
   el.innerHTML=ls.map(l=>`<b>${LAYER_NAME[l]}</b>`+ITEMS[l].map(it=>`<span><i style="background:${it.key==='kirecli'?'repeating-linear-gradient(45deg,#8FD4F5 0 3px,#2F6F95 3px 4.5px)':it.color}"></i>${esc(it.name)}</span>`).join('')).join('');
 }
 document.getElementById('showCities').onchange=e=>{state.cities=e.target.checked;draw();};
-document.getElementById('all').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=!['toprak','deprem','havza','bolge','iller'].includes(k));buildToggles();refresh();};
-document.getElementById('none').onclick=()=>{Object.keys(state.on).forEach(k=>state.on[k]=false);buildToggles();refresh();};
+function selectAllLayers(){Object.keys(state.on).forEach(k=>state.on[k]=!['toprak','deprem','havza','bolge','iller'].includes(k));buildToggles();refresh();}
+function clearAllLayers(){Object.keys(state.on).forEach(k=>state.on[k]=false);buildToggles();refresh();}
+document.getElementById('all').onclick=selectAllLayers;
+document.getElementById('none').onclick=clearAllLayers;
+document.getElementById('allMap').onclick=selectAllLayers;
+document.getElementById('noneMap').onclick=clearAllLayers;
+
+/* ---------- katman açılır menüsü (sağ üst) ---------- */
+const layerBtn=document.getElementById('layerBtn'),layerMenu=document.getElementById('layerMenu');
+layerBtn.onclick=e=>{e.stopPropagation();const open=layerMenu.hidden;layerMenu.hidden=!open;layerBtn.classList.toggle('on',open);layerBtn.setAttribute('aria-expanded',open?'true':'false');};
+layerMenu.onclick=e=>e.stopPropagation();
+document.addEventListener('click',()=>{if(!layerMenu.hidden){layerMenu.hidden=true;layerBtn.classList.remove('on');layerBtn.setAttribute('aria-expanded','false');}});
 
 /* ---------- quiz ---------- */
 // Doğrulama: tıklanan nokta hedefin alanı içinde ya da çizgisine/sınırına tolerans kadar yakınsa doğru.
@@ -1584,6 +1618,28 @@ function buildQuizPool(){
   return pool;
 }
 const qEl=document.getElementById('quizcard');
+/* ---------- soru kartını sürükleyerek taşıma ---------- */
+(function(){
+  let dragging=false,sx0=0,sy0=0,ox=0,oy=0;
+  qEl.addEventListener('pointerdown',e=>{
+    if(!e.target.closest('.qtop')||e.target.closest('button'))return;
+    const r=qEl.getBoundingClientRect();
+    dragging=true;sx0=e.clientX;sy0=e.clientY;ox=r.left;oy=r.top;
+    qEl.style.left=ox+'px';qEl.style.top=oy+'px';qEl.style.right='auto';qEl.style.transform='none';
+    qEl.setPointerCapture(e.pointerId);
+  });
+  qEl.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const pw=qEl.parentElement.clientWidth,ph=qEl.parentElement.clientHeight;
+    const nx=Math.min(Math.max(ox+e.clientX-sx0,-qEl.offsetWidth+40),pw-40);
+    const ny=Math.min(Math.max(oy+e.clientY-sy0,0),ph-40);
+    qEl.style.left=nx+'px';qEl.style.top=ny+'px';
+  });
+  const stopDrag=()=>{dragging=false;};
+  qEl.addEventListener('pointerup',stopDrag);
+  qEl.addEventListener('pointercancel',stopDrag);
+})();
+function resetCardPos(){qEl.style.left='';qEl.style.top='';qEl.style.right='';qEl.style.transform='';}
 function startQuiz(n){
   const pool=buildQuizPool();
   Object.assign(QUIZ,{active:true,mode:'explore',asked:n,pool:pool.slice(0,Math.min(n,pool.length)),idx:0,correct:0,answered:false,guess:null,target:null});
@@ -1634,7 +1690,7 @@ function renderQuizDone(){
   document.getElementById('qStop').onclick=endQuiz;
   QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);draw();
 }
-function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;
+function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;resetCardPos();
   if(savedLayers){state.on=savedLayers;savedLayers=null;buildToggles();}
   document.querySelector('.modeSel').hidden=false;
   document.getElementById(QUIZ.mode==='exam'?'modeExam':'modeExplore').hidden=false;
