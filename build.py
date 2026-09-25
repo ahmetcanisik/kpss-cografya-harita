@@ -10,7 +10,7 @@ SRC = ROOT / "src"
 
 template = (SRC / "template.html").read_text(encoding="utf-8")
 geo = json.loads((SRC / "geo.json").read_text(encoding="utf-8"))
-data = (SRC / "data.js").read_text(encoding="utf-8") + "\n" + (SRC / "notes.js").read_text(encoding="utf-8")
+data = (SRC / "data.js").read_text(encoding="utf-8") + "\n" + (SRC / "notes.js").read_text(encoding="utf-8") + "\n" + (SRC / "examdata.js").read_text(encoding="utf-8")
 app = (SRC / "app.js").read_text(encoding="utf-8")
 
 for marker in ("/*GEO*/", "/*DATA*/", "/*APP*/"):

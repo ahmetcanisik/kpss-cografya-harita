@@ -66,9 +66,19 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
 .quizbox{margin:0 0 18px;padding:12px 13px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
 .quizbox h2{margin-bottom:4px}
 .quizbox p{margin:0 0 10px;color:var(--ink-2);font-size:12.5px;line-height:1.4}
-#quizStart{display:flex;gap:6px;flex-wrap:wrap}
-#quizStart button,.qbar button{font:600 12.5px "Instrument Sans",sans-serif;color:var(--panel);background:var(--accent);border:0;border-radius:999px;padding:6px 12px;cursor:pointer}
-#quizStart button:hover,.qbar button:hover{filter:brightness(1.08)}
+.modeSel{display:flex;gap:6px;margin:0 0 10px}
+.modeSel button{flex:1;font:600 12px "Instrument Sans",sans-serif;color:var(--ink-2);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 8px;cursor:pointer}
+.modeSel button.on{color:var(--panel);background:var(--accent);border-color:var(--accent)}
+#quizStart,#examStart{display:flex;gap:6px;flex-wrap:wrap}
+#quizStart button,#examStart button,.qbar button{font:600 12.5px "Instrument Sans",sans-serif;color:var(--panel);background:var(--accent);border:0;border-radius:999px;padding:6px 12px;cursor:pointer}
+#quizStart button:hover,#examStart button:hover,.qbar button:hover{filter:brightness(1.08)}
+.qopts{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.qopt{text-align:left;font:600 13px "Instrument Sans",sans-serif;color:var(--ink);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
+.qopt:hover:not(:disabled){border-color:var(--accent)}
+.qopt:disabled{cursor:default}
+.qopt.correct{background:rgba(30,143,78,.22);border-color:#1E8F4E;color:#8ED39E}
+.qopt.wrong{background:rgba(198,40,40,.2);border-color:#C62828;color:#F29B9B}
+.qsrc{font-size:11px;color:var(--ink-2);margin:2px 0 0}
 .qcustom{display:flex;gap:8px;align-items:center;margin-top:8px}
 .qcustom input{width:100%;accent-color:var(--accent)}
 .qcustom output{min-width:56px;text-align:center;font-size:12px;color:var(--ink)}
@@ -143,16 +153,26 @@ h2{font-family:"Bricolage Grotesque","Instrument Sans",sans-serif;font-size:15px
     <div class="bar"><button id="all" type="button">Hepsini aç</button><button id="none" type="button">Temizle</button></div>
     <section class="quizbox">
       <h2>🧠 Bilgini test et</h2>
-      <p>Aktif katmanlardaki öğelerden rastgele soru sorulur. Nehirde çizgiye, ovada/ilde alanın içine ya da sınırına yakın tıklaman yeterli.</p>
-      <div id="quizStart" aria-label="Soru sayısı seçimi">
-        <button class="qn" type="button" data-n="5">5 soru</button>
-        <button class="qn" type="button" data-n="8">8 soru</button>
-        <button id="moreQuiz" type="button">Daha fazla…</button>
+      <div class="modeSel" role="tablist" aria-label="Çalışma modu">
+        <button class="modeBtn on" type="button" data-mode="explore" role="tab" aria-selected="true">🧭 Keşif Modu</button>
+        <button class="modeBtn" type="button" data-mode="exam" role="tab" aria-selected="false">📝 Çıkmış Sorular</button>
       </div>
-      <div id="quizCustom" class="qcustom" hidden>
-        <input id="quizCount" type="range" min="12" max="100" step="1" value="12" aria-label="Soru sayısı">
-        <output id="quizCountVal" for="quizCount">12 soru</output>
-        <button id="quizStartCustom" type="button">Başlat</button>
+      <div id="modeExplore">
+        <p>Aktif katmanlardaki öğelerden rastgele soru sorulur. Nehirde çizgiye, ovada/ilde alanın içine ya da sınırına yakın tıklaman yeterli.</p>
+        <div id="quizStart" aria-label="Soru sayısı seçimi">
+          <button class="qn" type="button" data-n="5">5 soru</button>
+          <button class="qn" type="button" data-n="8">8 soru</button>
+          <button id="moreQuiz" type="button">Daha fazla…</button>
+        </div>
+        <div id="quizCustom" class="qcustom" hidden>
+          <input id="quizCount" type="range" min="12" max="100" step="1" value="12" aria-label="Soru sayısı">
+          <output id="quizCountVal" for="quizCount">12 soru</output>
+          <button id="quizStartCustom" type="button">Başlat</button>
+        </div>
+      </div>
+      <div id="modeExam" hidden>
+        <p>Gerçek KPSS'de çıkmış coğrafya sorularını, orijinal şıklarıyla çöz. Haritalı sorularda ilgili yerler haritamızda aynı Romen rakamlarıyla işaretlenir.</p>
+        <div id="examStart"><button id="examStartBtn" type="button">Başlat</button></div>
       </div>
     </section>
     <div id="toggles"></div>

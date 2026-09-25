@@ -156,6 +156,21 @@ function renderOverlay(){
     SEAS.forEach(s=>{const [wx,wy]=P(s[1],s[2]);const x=sx(wx),y=sy(wy);if(!inView(x,y,100))return;const bw=tw(s[0],12,500,true);const r={x1:x-bw/2,y1:y-7,x2:x+bw/2,y2:y+7};
       if(free(r)){placed.push(r);out+=txt(s[0],x,y+4,12,500,C.sea,true,'middle');}});
   }
+  // çıkmış soru: haritalı soru işaretleri (Romen rakamlı)
+  if(QUIZ.mode==='exam'&&QUIZ.examQ&&QUIZ.examQ.map){
+    const perMarkerAnswer=QUIZ.examQ.map.length===QUIZ.examQ.options.length;
+    QUIZ.examQ.map.forEach((m,i)=>{
+      const [wx,wy]=P(m.lon,m.lat),x=sx(wx),y=sy(wy);
+      let fill='#E8B04A',stroke='#16262E';
+      if(QUIZ.answered&&perMarkerAnswer){
+        if(i===QUIZ.examQ.answer){fill='#1E8F4E';}
+        else if(i===QUIZ.selOpt){fill='#C62828';}
+        else{fill='#8FA0A8';}
+      }
+      out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
+      out+=`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${m.roman}</text>`;
+    });
+  }
   // quiz işaretleri
   if(QUIZ.active&&QUIZ.answered&&QUIZ.guess){
     const t=QUIZ.target,gx=sx(QUIZ.guess[0]),gy=sy(QUIZ.guess[1]);
@@ -199,7 +214,7 @@ svg.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=
   else if(ptrs.size===2){ptrs.set(e.pointerId,[e.clientX,e.clientY]);const [a,b]=[...ptrs.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);const r=svg.getBoundingClientRect();
     if(lastD)zoomAt(d/lastD,(a[0]+b[0])/2-r.left,(a[1]+b[1])/2-r.top);lastD=d;moveDist+=10;}});
 const up=e=>{const wasSingle=ptrs.size===1;ptrs.delete(e.pointerId);lastD=0;if(!ptrs.size)svg.classList.remove('drag');
-  if(wasSingle&&QUIZ.active&&!QUIZ.answered&&QUIZ.target&&moveDist<6){const r=svg.getBoundingClientRect();submitGuess(e.clientX-r.left,e.clientY-r.top);}
+  if(wasSingle&&QUIZ.active&&QUIZ.mode==='explore'&&!QUIZ.answered&&QUIZ.target&&moveDist<6){const r=svg.getBoundingClientRect();submitGuess(e.clientX-r.left,e.clientY-r.top);}
   moveDist=0;};
 svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
 svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*0.0016),e.clientX-r.left,e.clientY-r.top);},{passive:false});
@@ -278,7 +293,8 @@ document.getElementById('none').onclick=()=>{Object.keys(state.on).forEach(k=>st
 
 /* ---------- quiz ---------- */
 // Doğrulama: tıklanan nokta hedefin alanı içinde ya da çizgisine/sınırına tolerans kadar yakınsa doğru.
-const QUIZ={active:false,pool:[],idx:0,total:8,correct:0,answered:false,guess:null,target:null,ok:false,near:null,dist:0,asked:8};
+const QUIZ={active:false,mode:'explore',pool:[],idx:0,total:8,correct:0,answered:false,guess:null,target:null,ok:false,near:null,dist:0,asked:8,examOrder:[],examQ:null,selOpt:-1};
+let savedLayers=null;
 const TOL_PX=14, MIN_TOL_KM=8, MAX_TOL_KM=30;
 const DEFAULT_CATS=['kivrim','volkanik','kirik','ova','plato','masif','nehirler','goller','bolge'];
 function kmPerWorld(lat){return {x:111.32*Math.cos(lat*Math.PI/180)/KX,y:110.57/KY};}
@@ -322,9 +338,9 @@ function buildQuizPool(){
 const qEl=document.getElementById('quizcard');
 function startQuiz(n){
   const pool=buildQuizPool();
-  Object.assign(QUIZ,{active:true,asked:n,pool:pool.slice(0,Math.min(n,pool.length)),idx:0,correct:0,answered:false,guess:null,target:null});
+  Object.assign(QUIZ,{active:true,mode:'explore',asked:n,pool:pool.slice(0,Math.min(n,pool.length)),idx:0,correct:0,answered:false,guess:null,target:null});
   QUIZ.total=QUIZ.pool.length;QUIZ.short=pool.length<n;
-  document.getElementById('quizStart').hidden=true;document.getElementById('quizCustom').hidden=true;
+  document.querySelector('.modeSel').hidden=true;document.getElementById('modeExplore').hidden=true;document.getElementById('modeExam').hidden=true;
   document.getElementById('items').hidden=true;qEl.hidden=false;buildLegend();
   nextQ(false);
 }
@@ -366,17 +382,75 @@ function renderQuizDone(){
     <div class="qdone"><div class="qscore">${QUIZ.correct}/${QUIZ.total}</div><div>doğru (%${pct})</div></div>
     <div class="qbar"><button id="qAgain">Tekrar oyna</button><button id="qStop" class="ghost">Bitir</button></div>`;
   document.getElementById('qClose').onclick=endQuiz;
-  document.getElementById('qAgain').onclick=()=>startQuiz(QUIZ.asked);
+  document.getElementById('qAgain').onclick=()=>QUIZ.mode==='exam'?startExamQuiz():startQuiz(QUIZ.asked);
   document.getElementById('qStop').onclick=endQuiz;
-  QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;highlight(null);draw();
+  QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);draw();
 }
-function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;highlight(null);qEl.hidden=true;
-  document.getElementById('quizStart').hidden=false;document.getElementById('items').hidden=false;buildLegend();draw();}
+function endQuiz(){QUIZ.active=false;QUIZ.answered=false;QUIZ.guess=null;QUIZ.target=null;QUIZ.examQ=null;highlight(null);qEl.hidden=true;
+  if(savedLayers){state.on=savedLayers;savedLayers=null;buildToggles();}
+  document.querySelector('.modeSel').hidden=false;
+  document.getElementById(QUIZ.mode==='exam'?'modeExam':'modeExplore').hidden=false;
+  document.getElementById('items').hidden=false;refresh();}
 document.querySelectorAll('.qn').forEach(b=>b.onclick=()=>startQuiz(+b.dataset.n));
 const qCount=document.getElementById('quizCount'),qCountVal=document.getElementById('quizCountVal');
 document.getElementById('moreQuiz').onclick=()=>{const c=document.getElementById('quizCustom');c.hidden=!c.hidden;if(!c.hidden)qCount.focus();};
 qCount.oninput=()=>{qCountVal.textContent=qCount.value+' soru';};
 document.getElementById('quizStartCustom').onclick=()=>startQuiz(+qCount.value);
+
+/* ---------- çıkmış sorular (gerçek KPSS soruları, şıklı) ---------- */
+document.getElementById('examStartBtn').textContent=`Başlat (${EXAM_Q.length} soru)`;
+document.querySelectorAll('.modeBtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.modeBtn').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-selected',x===b?'true':'false');});
+  const exam=b.dataset.mode==='exam';
+  document.getElementById('modeExplore').hidden=exam;
+  document.getElementById('modeExam').hidden=!exam;
+});
+function startExamQuiz(){
+  const order=EXAM_Q.map((_,i)=>i);
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+  Object.assign(QUIZ,{active:true,mode:'exam',examOrder:order,idx:0,total:order.length,correct:0,answered:false,selOpt:-1,examQ:null,target:null,guess:null});
+  savedLayers={...state.on};
+  Object.keys(state.on).forEach(k=>state.on[k]=false);
+  buildToggles();buildZones();
+  document.querySelector('.modeSel').hidden=true;document.getElementById('modeExplore').hidden=true;document.getElementById('modeExam').hidden=true;
+  document.getElementById('items').hidden=true;qEl.hidden=false;buildLegend();
+  nextExamQ(false);
+}
+function nextExamQ(advance){
+  if(advance)QUIZ.idx++;
+  QUIZ.answered=false;QUIZ.selOpt=-1;
+  if(QUIZ.idx>=QUIZ.total){QUIZ.examQ=null;renderQuizDone();return;}
+  QUIZ.examQ=EXAM_Q[QUIZ.examOrder[QUIZ.idx]];
+  renderExamCard();draw();
+}
+function submitExamAnswer(i){
+  if(!QUIZ.active||QUIZ.answered)return;
+  QUIZ.answered=true;QUIZ.selOpt=i;
+  if(i===QUIZ.examQ.answer)QUIZ.correct++;
+  renderExamCard();draw();
+}
+function renderExamCard(){
+  const q=QUIZ.examQ;
+  let html=`<div class="qtop"><span>Soru ${QUIZ.idx+1}/${QUIZ.total}</span><span>Puan: ${QUIZ.correct}</span><button id="qClose" aria-label="Kapat">✕</button></div>`;
+  html+=`<p class="qsrc">${esc(q.exam)}</p><div class="qq">${esc(q.q).replace(/\n/g,'<br>')}</div>`;
+  html+='<div class="qopts">'+q.options.map((opt,i)=>{
+    let cls='qopt';
+    if(QUIZ.answered){if(i===q.answer)cls+=' correct';else if(i===QUIZ.selOpt)cls+=' wrong';}
+    return `<button class="${cls}" data-i="${i}" ${QUIZ.answered?'disabled':''}>${String.fromCharCode(65+i)}) ${esc(opt)}</button>`;
+  }).join('')+'</div>';
+  if(QUIZ.answered){
+    const msg=QUIZ.selOpt===q.answer?'✔ Doğru!':`✘ Olmadı — doğru cevap ${String.fromCharCode(65+q.answer)}) ${esc(q.options[q.answer])}.`;
+    html+=`<div class="qres ${QUIZ.selOpt===q.answer?'ok':'no'}">${msg}</div>`;
+    html+=`<div class="qbar"><button id="qNext">${QUIZ.idx+1>=QUIZ.total?'Sonuçları gör':'Sonraki soru →'}</button></div>`;
+  } else if(q.map){
+    html+='<div class="qhint">Şıklar, haritada işaretlenen yerlere karşılık gelir.</div>';
+  }
+  qEl.innerHTML=html;
+  document.getElementById('qClose').onclick=endQuiz;
+  qEl.querySelectorAll('.qopt').forEach(b=>b.onclick=()=>submitExamAnswer(+b.dataset.i));
+  if(QUIZ.answered)document.getElementById('qNext').onclick=()=>nextExamQ(true);
+}
+document.getElementById('examStartBtn').onclick=startExamQuiz;
 
 buildWorld();buildToggles();refresh();
 new ResizeObserver(resize).observe(svg);resize();
